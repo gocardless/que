@@ -102,27 +102,6 @@ describe "Managing the Worker pool" do
         Que::Job.enqueue
         sleep_until { DB[:que_jobs].count == 0 }
       end
-
-      it "should work jobs in the queue defined by QUE_QUEUE" do
-        begin
-          Que::Job.enqueue 1
-          Que::Job.enqueue 2, :queue => 'my_queue'
-
-          ENV['QUE_QUEUE'] = 'my_queue'
-
-          Que.mode = :async
-          Que.worker_count = 2
-
-          sleep_until { Que::Worker.workers.all? &:sleeping? }
-          DB[:que_jobs].count.should be 1
-
-          job = DB[:que_jobs].first
-          job[:queue].should == ''
-          job[:args].should == '[1]'
-        ensure
-          ENV.delete('QUE_QUEUE')
-        end
-      end
     end
   end
 
