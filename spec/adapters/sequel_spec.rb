@@ -29,21 +29,21 @@ describe "Que using the Sequel adapter" do
   it "should wake up a Worker after queueing a job in async mode, waiting for a transaction to commit if necessary" do
     Que.mode = :async
     Que.worker_count = 4
-    sleep_until { Que::Worker.workers.all? &:sleeping? }
+    sleep_until { Que.default_worker_pool.workers.all? &:sleeping? }
 
     # Wakes a worker immediately when not in a transaction.
     Que::Job.enqueue
-    sleep_until { Que::Worker.workers.all?(&:sleeping?) && DB[:que_jobs].empty? }
+    sleep_until { Que.default_worker_pool.workers.all?(&:sleeping?) && DB[:que_jobs].empty? }
 
     SEQUEL_ADAPTER_DB.transaction do
       Que::Job.enqueue
-      Que::Worker.workers.each { |worker| worker.should be_sleeping }
+      Que.default_worker_pool.workers.each { |worker| worker.should be_sleeping }
     end
-    sleep_until { Que::Worker.workers.all?(&:sleeping?) && DB[:que_jobs].empty? }
+    sleep_until { Que.default_worker_pool.workers.all?(&:sleeping?) && DB[:que_jobs].empty? }
 
     # Do nothing when queueing with a specific :run_at.
     BlockJob.enqueue :run_at => Time.now
-    Que::Worker.workers.each { |worker| worker.should be_sleeping }
+    Que.default_worker_pool.workers.each { |worker| worker.should be_sleeping }
   end
 
   it "should be able to tell when it's in a Sequel transaction" do

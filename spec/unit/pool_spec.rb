@@ -25,7 +25,7 @@ describe "Managing the Worker pool" do
         Que.connection = nil
         Que.worker_count = 0
         Que.mode = :off
-        Que::Worker.workers.should == []
+        Que.default_worker_pool.workers.should == []
       end
 
       it "with worker_count > 0 should not instantiate workers or hit the db" do
@@ -33,7 +33,7 @@ describe "Managing the Worker pool" do
         Que.mode = :off
         Que.worker_count = 5
         Que.mode = :off
-        Que::Worker.workers.should == []
+        Que.default_worker_pool.workers.should == []
       end
     end
 
@@ -42,7 +42,7 @@ describe "Managing the Worker pool" do
         Que.connection = nil
         Que.worker_count = 0
         Que.mode = :sync
-        Que::Worker.workers.should == []
+        Que.default_worker_pool.workers.should == []
       end
 
       it "with worker_count > 0 should not instantiate workers or hit the db" do
@@ -50,7 +50,7 @@ describe "Managing the Worker pool" do
         Que.mode = :sync
         Que.worker_count = 5
         Que.mode = :sync
-        Que::Worker.workers.should == []
+        Que.default_worker_pool.workers.should == []
       end
 
       it "should make jobs run in the same thread as they are queued" do
@@ -82,22 +82,22 @@ describe "Managing the Worker pool" do
         Que.connection = nil
         Que.worker_count = 0
         Que.mode = :async
-        Que::Worker.workers.map{|w| [w.state, w.thread.status]}.should == []
+        Que.default_worker_pool.workers.map{|w| [w.state, w.thread.status]}.should == []
       end
 
       it "with worker_count > 0 should instantiate workers and hit the db" do
         Que::Job.enqueue
         Que.worker_count = 5
         Que.mode = :async
-        sleep_until { Que::Worker.workers.all? &:sleeping? }
+        sleep_until { Que.default_worker_pool.workers.all? &:sleeping? }
         DB[:que_jobs].count.should == 0
-        Que::Worker.workers.map{|w| [w.state, w.thread.status]}.should == [[:sleeping, 'sleep']] * 5
+        Que.default_worker_pool.workers.map{|w| [w.state, w.thread.status]}.should == [[:sleeping, 'sleep']] * 5
       end
 
       it "should wake a worker every Que.wake_interval seconds" do
         Que.worker_count = 4
         Que.mode = :async
-        sleep_until { Que::Worker.workers.all? &:sleeping? }
+        sleep_until { Que.default_worker_pool.workers.all? &:sleeping? }
         Que.wake_interval = 0.01 # 10 ms
         Que::Job.enqueue
         sleep_until { DB[:que_jobs].count == 0 }
@@ -111,23 +111,23 @@ describe "Managing the Worker pool" do
         Que.worker_count.should == 0
         Que.connection = nil
         Que.mode = :off
-        Que::Worker.workers.should == []
+        Que.default_worker_pool.workers.should == []
 
         Que.worker_count = 4
         Que.worker_count.should == 4
-        Que::Worker.workers.should == []
+        Que.default_worker_pool.workers.should == []
 
         Que.worker_count = 6
         Que.worker_count.should == 6
-        Que::Worker.workers.should == []
+        Que.default_worker_pool.workers.should == []
 
         Que.worker_count = 2
         Que.worker_count.should == 2
-        Que::Worker.workers.should == []
+        Que.default_worker_pool.workers.should == []
 
         Que.worker_count = 0
         Que.worker_count.should == 0
-        Que::Worker.workers.should == []
+        Que.default_worker_pool.workers.should == []
       end
     end
 
@@ -136,23 +136,23 @@ describe "Managing the Worker pool" do
         Que.worker_count.should == 0
         Que.connection = nil
         Que.mode = :sync
-        Que::Worker.workers.should == []
+        Que.default_worker_pool.workers.should == []
 
         Que.worker_count = 4
         Que.worker_count.should == 4
-        Que::Worker.workers.should == []
+        Que.default_worker_pool.workers.should == []
 
         Que.worker_count = 6
         Que.worker_count.should == 6
-        Que::Worker.workers.should == []
+        Que.default_worker_pool.workers.should == []
 
         Que.worker_count = 2
         Que.worker_count.should == 2
-        Que::Worker.workers.should == []
+        Que.default_worker_pool.workers.should == []
 
         Que.worker_count = 0
         Que.worker_count.should == 0
-        Que::Worker.workers.should == []
+        Que.default_worker_pool.workers.should == []
       end
     end
 
@@ -161,15 +161,15 @@ describe "Managing the Worker pool" do
         Que.mode = :async
         Que::Job.enqueue
         Que.worker_count = 4
-        sleep_until { Que::Worker.workers.all?(&:sleeping?) }
-        Que::Worker.workers.map{|w| [w.state, w.thread.status]}.should == [[:sleeping, 'sleep']] * 4
+        sleep_until { Que.default_worker_pool.workers.all?(&:sleeping?) }
+        Que.default_worker_pool.workers.map{|w| [w.state, w.thread.status]}.should == [[:sleeping, 'sleep']] * 4
         DB[:que_jobs].count.should == 0
       end
 
       it "should stop hitting the DB when transitioning to zero" do
         Que.mode = :async
         Que.worker_count = 4
-        sleep_until { Que::Worker.workers.all?(&:sleeping?) }
+        sleep_until { Que.default_worker_pool.workers.all?(&:sleeping?) }
         Que.connection = nil
         Que.worker_count = 0
         $logger.messages.map{|m| JSON.load(m).values_at('event', 'value')}.should ==
@@ -180,15 +180,15 @@ describe "Managing the Worker pool" do
         Que.mode = :async
         Que.worker_count = 4
 
-        workers = Que::Worker.workers.dup
+        workers = Que.default_worker_pool.workers.dup
         workers.count.should be 4
-        sleep_until { Que::Worker.workers.all?(&:sleeping?) }
+        sleep_until { Que.default_worker_pool.workers.all?(&:sleeping?) }
 
         Que.worker_count = 2
-        Que::Worker.workers.count.should be 2
-        sleep_until { Que::Worker.workers.all?(&:sleeping?) }
+        Que.default_worker_pool.workers.count.should be 2
+        sleep_until { Que.default_worker_pool.workers.all?(&:sleeping?) }
 
-        workers[0..1].should == Que::Worker.workers
+        workers[0..1].should == Que.default_worker_pool.workers
         workers[2..3].each do |worker|
           worker.should be_an_instance_of Que::Worker
           worker.thread.status.should == false
@@ -201,15 +201,15 @@ describe "Managing the Worker pool" do
       it "should be able to scale up the number of workers gracefully" do
         Que.mode = :async
         Que.worker_count = 4
-        workers = Que::Worker.workers.dup
+        workers = Que.default_worker_pool.workers.dup
         workers.count.should be 4
 
-        sleep_until { Que::Worker.workers.all?(&:sleeping?) }
+        sleep_until { Que.default_worker_pool.workers.all?(&:sleeping?) }
         Que.worker_count = 6
-        Que::Worker.workers.count.should be 6
-        sleep_until { Que::Worker.workers.all?(&:sleeping?) }
+        Que.default_worker_pool.workers.count.should be 6
+        sleep_until { Que.default_worker_pool.workers.all?(&:sleeping?) }
 
-        workers.should == Que::Worker.workers[0..3]
+        workers.should == Que.default_worker_pool.workers[0..3]
 
         $logger.messages.map{|m| JSON.load(m).values_at('event', 'value')}.should ==
           [['mode_change', 'async'], ['worker_count_change', '4']] + [['job_unavailable', nil]] * 4 + [['worker_count_change', '6']] + [['job_unavailable', nil]] * 2
@@ -222,9 +222,9 @@ describe "Managing the Worker pool" do
       Que.connection = nil
       Que.mode = :off
       Que.worker_count = 4
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
+      sleep_until { Que.default_worker_pool.workers.all? &:sleeping? }
       Que.wake!
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
+      sleep_until { Que.default_worker_pool.workers.all? &:sleeping? }
       $logger.messages.map{|m| JSON.load(m).values_at('event', 'value')}.should ==
         [['mode_change', 'off'], ['worker_count_change', '4']]
     end
@@ -233,9 +233,9 @@ describe "Managing the Worker pool" do
       Que.connection = nil
       Que.mode = :sync
       Que.worker_count = 4
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
+      sleep_until { Que.default_worker_pool.workers.all? &:sleeping? }
       Que.wake!
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
+      sleep_until { Que.default_worker_pool.workers.all? &:sleeping? }
       $logger.messages.map{|m| JSON.load(m).values_at('event', 'value')}.should ==
         [['mode_change', 'sync'], ['worker_count_change', '4']]
     end
@@ -244,9 +244,9 @@ describe "Managing the Worker pool" do
       Que.connection = nil
       Que.mode = :async
       Que.worker_count = 0
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
+      sleep_until { Que.default_worker_pool.workers.all? &:sleeping? }
       Que.wake!
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
+      sleep_until { Que.default_worker_pool.workers.all? &:sleeping? }
       $logger.messages.map{|m| JSON.load(m).values_at('event', 'value')}.should ==
         [['mode_change', 'async'], ['worker_count_change', '0']]
     end
@@ -254,25 +254,25 @@ describe "Managing the Worker pool" do
     it "when mode = :async and worker_count > 0 should wake up a single worker" do
       Que.mode = :async
       Que.worker_count = 4
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
+      sleep_until { Que.default_worker_pool.workers.all? &:sleeping? }
 
       BlockJob.enqueue
       Que.wake!
 
       $q1.pop
-      Que::Worker.workers.first.should be_working
-      Que::Worker.workers[1..3].each { |w| w.should be_sleeping }
+      Que.default_worker_pool.workers.first.should be_working
+      Que.default_worker_pool.workers[1..3].each { |w| w.should be_sleeping }
       DB[:que_jobs].count.should be 1
       $q2.push nil
 
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
+      sleep_until { Que.default_worker_pool.workers.all? &:sleeping? }
       DB[:que_jobs].count.should be 0
     end
 
     it "when mode = :async and worker_count > 0 should be thread-safe" do
       Que.mode = :async
       Que.worker_count = 4
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
+      sleep_until { Que.default_worker_pool.workers.all? &:sleeping? }
       threads = 4.times.map { Thread.new { 100.times { Que.wake! } } }
       threads.each(&:join)
     end
@@ -283,9 +283,9 @@ describe "Managing the Worker pool" do
       Que.connection = nil
       Que.mode = :off
       Que.worker_count = 4
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
+      sleep_until { Que.default_worker_pool.workers.all? &:sleeping? }
       Que.wake_all!
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
+      sleep_until { Que.default_worker_pool.workers.all? &:sleeping? }
       $logger.messages.map{|m| JSON.load(m).values_at('event', 'value')}.should ==
         [['mode_change', 'off'], ['worker_count_change', '4']]
     end
@@ -294,9 +294,9 @@ describe "Managing the Worker pool" do
       Que.connection = nil
       Que.mode = :sync
       Que.worker_count = 4
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
+      sleep_until { Que.default_worker_pool.workers.all? &:sleeping? }
       Que.wake_all!
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
+      sleep_until { Que.default_worker_pool.workers.all? &:sleeping? }
       $logger.messages.map{|m| JSON.load(m).values_at('event', 'value')}.should ==
         [['mode_change', 'sync'], ['worker_count_change', '4']]
     end
@@ -305,9 +305,9 @@ describe "Managing the Worker pool" do
       Que.connection = nil
       Que.mode = :async
       Que.worker_count = 0
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
+      sleep_until { Que.default_worker_pool.workers.all? &:sleeping? }
       Que.wake_all!
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
+      sleep_until { Que.default_worker_pool.workers.all? &:sleeping? }
       $logger.messages.map{|m| JSON.load(m).values_at('event', 'value')}.should ==
         [['mode_change', 'async'], ['worker_count_change', '0']]
     end
@@ -318,23 +318,23 @@ describe "Managing the Worker pool" do
 
       Que.mode = :async
       Que.worker_count = 4
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
+      sleep_until { Que.default_worker_pool.workers.all? &:sleeping? }
 
       4.times { BlockJob.enqueue }
       Que.wake_all!
       4.times { $q1.pop }
 
-      Que::Worker.workers.each{ |worker| worker.should be_working }
+      Que.default_worker_pool.workers.each{ |worker| worker.should be_working }
       4.times { $q2.push nil }
 
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
+      sleep_until { Que.default_worker_pool.workers.all? &:sleeping? }
       DB[:que_jobs].count.should be 0
     end if QUE_ADAPTERS[:pond]
 
     it "when mode = :async and worker_count > 0 should be thread-safe" do
       Que.mode = :async
       Que.worker_count = 4
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
+      sleep_until { Que.default_worker_pool.workers.all? &:sleeping? }
       threads = 4.times.map { Thread.new { 100.times { Que.wake_all! } } }
       threads.each(&:join)
     end

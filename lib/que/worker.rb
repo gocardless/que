@@ -109,7 +109,7 @@ module Que
 
     class << self
       def workers
-        warn "Que::Worker.workers has been deprecated and will be removed in a future version of Que"
+        warn "Que.default_worker_pool.workers has been deprecated and will be removed in a future version of Que"
         Que.default_worker_pool.workers
       end
     end
