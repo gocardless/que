@@ -77,7 +77,7 @@ module Que
         end
 
         if Que.mode == :sync && !t
-          run(*JSON.parse(attrs[:args].to_json))
+          run(*attrs[:args])
         else
           values = Que.execute(:insert_job, attrs.values_at(:queue, :priority, :run_at, :job_class, :retryable, :args)).first
           Que.adapter.wake_worker_after_commit unless t

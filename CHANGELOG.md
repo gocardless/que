@@ -1,7 +1,3 @@
-### 0.11.7 (2017-05-01)
-
-*   Serialize and de-serialize job args when Que.mode = :sync  (lawrencejones)
-
 ### 0.11.6 (2016-07-01)
 
 *   Fix for operating in nested transactions in Rails 5.0. (#160) (greysteil)
