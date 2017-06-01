@@ -1,3 +1,7 @@
+### 0.11.7 (2017-06-01)
+
+*   Fix security vulnerability in parsing JSON from the DB (by specifying create_additions: false). This shouldn't be a concern unless you were passing untrusted user input in your job arguments. (hmac)
+
 ### 0.11.6 (2016-07-01)
 
 *   Fix for operating in nested transactions in Rails 5.0. (#160) (greysteil)
