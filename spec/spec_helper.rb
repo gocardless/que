@@ -74,7 +74,7 @@ end
 
 # Helper to display spec descriptions.
 description_builder = -> hash do
-  if g = hash[:example_group]
+  if g = hash[:parent_example_group]
     "#{description_builder.call(g)} #{hash[:description_args].first}"
   else
     hash[:description_args].first
@@ -86,7 +86,7 @@ stdout = Logger.new(STDOUT)
 RSpec.configure do |config|
   config.around do |spec|
     # Figure out which spec is about to run, for logging purposes.
-    data = example.metadata
+    data = spec.metadata
     desc = description_builder.call(data)
     line = "rspec #{data[:file_path]}:#{data[:line_number]}"
 

@@ -1,0 +1,81 @@
+version: 2
+jobs:
+  build_ruby2.4:
+    working_directory: ~/que
+    docker:
+      - image: circleci/ruby:2.4.1
+        environment:
+          DATABASE_URL: postgres://postgres@localhost/postgres
+          TESTS: 5
+      - image: postgres:9.3
+    steps:
+      - checkout
+      - run: sudo apt-get install postgresql postgresql-client
+      - run: bundle install
+      - run: bundle exec ruby -r sequel -r ./lib/que -e 'Que.connection=Sequel.connect(ENV["DATABASE_URL"]); Que.migrate!'
+      - run: bundle exec ruby spec/ci.rb
+  build_ruby2.3:
+    working_directory: ~/que
+    docker:
+      - image: circleci/ruby:2.3
+        environment:
+          DATABASE_URL: postgres://postgres@localhost/postgres
+          TESTS: 5
+      - image: postgres:9.3
+    steps:
+      - checkout
+      - run: sudo apt-get install postgresql postgresql-client
+      - run: bundle install
+      - run: bundle exec ruby -r sequel -r ./lib/que -e 'Que.connection=Sequel.connect(ENV["DATABASE_URL"]); Que.migrate!'
+      - run: bundle exec ruby spec/ci.rb
+  build_ruby2.2:
+    working_directory: ~/que
+    docker:
+      - image: circleci/ruby:2.2
+        environment:
+          DATABASE_URL: postgres://postgres@localhost/postgres
+          TESTS: 5
+      - image: postgres:9.3
+    steps:
+      - checkout
+      - run: sudo apt-get install postgresql postgresql-client
+      - run: bundle install
+      - run: bundle exec ruby -r sequel -r ./lib/que -e 'Que.connection=Sequel.connect(ENV["DATABASE_URL"]); Que.migrate!'
+      - run: bundle exec ruby spec/ci.rb
+  build_ruby2.1:
+    working_directory: ~/que
+    docker:
+      - image: circleci/ruby:2.1
+        environment:
+          DATABASE_URL: postgres://postgres@localhost/postgres
+          TESTS: 5
+      - image: postgres:9.3
+    steps:
+      - checkout
+      - run: sudo apt-get install postgresql postgresql-client
+      - run: bundle install
+      - run: bundle exec ruby -r sequel -r ./lib/que -e 'Que.connection=Sequel.connect(ENV["DATABASE_URL"]); Que.migrate!'
+      - run: bundle exec ruby spec/ci.rb
+  build_ruby2.0:
+    working_directory: ~/que
+    docker:
+      - image: circleci/ruby:2
+        environment:
+          DATABASE_URL: postgres://postgres@localhost/postgres
+          TESTS: 5
+      - image: postgres:9.3
+    steps:
+      - checkout
+      - run: sudo apt-get install postgresql postgresql-client
+      - run: bundle install
+      - run: bundle exec ruby -r sequel -r ./lib/que -e 'Que.connection=Sequel.connect(ENV["DATABASE_URL"]); Que.migrate!'
+      - run: bundle exec ruby spec/ci.rb
+workflows:
+  version: 2
+  build_and_test:
+    jobs:
+      - build_ruby2.4
+      - build_ruby2.3
+      - build_ruby2.2
+      - build_ruby2.1
+      - build_ruby2.0
