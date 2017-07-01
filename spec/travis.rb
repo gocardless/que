@@ -13,7 +13,7 @@ test_runs = if ENV['TESTS']
 # I think travis might be pausing jobs, let's try a higher timeout
 QUE_TEST_TIMEOUT = 10
 
-%w( Gemfile spec/gemfiles/Gemfile1 spec/gemfiles/Gemfile2 ).each do |gemfile|
+%w( Gemfile spec/gemfiles/Gemfile1 ).each do |gemfile|
   # Install the particular gemfile
   system("BUNDLE_GEMFILE=#{gemfile} bundle")
   1.upto(test_runs) do |i|
