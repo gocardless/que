@@ -77,7 +77,11 @@ module Que
         end
 
         if Que.mode == :sync && !t
-          run(*attrs[:args])
+          # We need to run this through JSON serializers to ensure we get a pure JSON
+          # result. Que then does some seriously weird stuff with the `json_converter`
+          # to make the hashes we pass to Que jobs respond to both symbols and strings.
+          # We should use the json_converter here to be consistent.
+          run(*Que.json_converter.call(parse_json(generate_json(attrs)))[:args])
         else
           values = Que.execute(:insert_job, attrs.values_at(:queue, :priority, :run_at, :job_class, :retryable, :args)).first
           Que.adapter.wake_worker_after_commit unless t
@@ -160,6 +164,16 @@ module Que
       end
 
       private
+
+      def parse_json(json)
+        return JSON_MODULE.parse(json) if JSON_MODULE.respond_to?(:parse)
+        JSON_MODULE.load(json)
+      end
+
+      def generate_json(obj)
+        return JSON_MODULE.generate(obj) if JSON_MODULE.respond_to?(:generate)
+        JSON_MODULE.dump(obj)
+      end
 
       def class_for(string)
         Que.constantize(string)
