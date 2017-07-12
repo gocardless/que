@@ -1,3 +1,7 @@
+### 0.11.8 (2017-07-12)
+
+*   Serialise and deserialise job args when running in sync mode. (georgea93)
+
 ### 0.11.7 (2017-06-01)
 
 *   Fix security vulnerability in parsing JSON from the DB (by specifying create_additions: false). This shouldn't be a concern unless you were passing untrusted user input in your job arguments. (hmac)
