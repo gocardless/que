@@ -73,40 +73,11 @@ module Que
 
     def work_loop
       loop do
-        cycle = nil
-
-        if Que.mode == :async
-          time   = Time.now
-          result = Job.work(queue)
-
-          case result[:event]
-          when :job_unavailable
-            cycle = false
-            result[:level] = :debug
-          when :job_race_condition
-            cycle = true
-            result[:level] = :debug
-          when :job_worked
-            cycle = true
-            result[:elapsed] = (Time.now - time).round(5)
-          when :job_errored
-            # For PG::Errors, assume we had a problem reaching the database, and
-            # don't hit it again right away.
-            cycle = !result[:error].is_a?(PG::Error)
-            result[:error] = {:class => result[:error].class.to_s, :message => result[:error].message}
-          else
-            raise "Unknown Event: #{result[:event].inspect}"
-          end
-
-          Que.log(result)
+        case Job.work(queue)
+        when :job_not_found then sleep(self.class.wake_interval)
+        when :job_worked then nil # immediately find a new job to work
         end
-
-        synchronize { @state = :sleeping unless cycle || @stop }
-        sleep if @state == :sleeping
-        break if @stop
       end
-    ensure
-      @state = :stopped
     end
 
     # Setting Que.wake_interval = nil should ensure that the wrangler thread
