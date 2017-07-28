@@ -74,7 +74,7 @@ module Que
     def work_loop
       loop do
         case Job.work(queue)
-        when :job_not_found then sleep(self.class.wake_interval)
+        when :job_not_found, :error then sleep(self.class.wake_interval)
         when :job_worked then nil # immediately find a new job to work
         end
       end
