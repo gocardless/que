@@ -27,10 +27,11 @@ module Que
       # We return an instantiated Job class so that the caller can see the record that's
       # been inserted into the DB. In future, we might wish to change this, but for now
       # we'll keep it for compatibility.
-      inserted_job = Que.execute(:insert_job, attrs.values_at(*JOB_OPTIONS, :args)).first
+      inserted_job =
+        Que.execute(:insert_job, [*attrs.values_at(*JOB_OPTIONS), args]).first
 
       job = new(inserted_job)
-      job.run_and_destroy if Que.mode == :sync
+      job.run_and_destroy(*inserted_job[:args]) if Que.mode == :sync
       job
     end
 
