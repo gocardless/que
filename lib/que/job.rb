@@ -4,7 +4,17 @@ module Que
   class Job
     # These are order dependent, as we use them in prepared statements
     JOB_OPTIONS = %i[queue priority run_at job_class retryable].freeze
-    JOB_INSTANCE_FIELDS = %i[queue priority run_at job_id].freeze
+
+    # These are set in the class definition of the Job, as instance variables on the class
+    def self.default_attrs
+      {
+        job_class: self.to_s,
+        queue:     @queue,
+        priority:  @priority,
+        run_at:    @run_at&.call,
+        retryable: true,
+      }
+    end
 
     def self.enqueue(*args, **kwargs)
       attrs = default_attrs.merge(kwargs.slice(*JOB_OPTIONS))
@@ -22,70 +32,6 @@ module Que
       job = new(inserted_job)
       job.run_and_destroy if Que.mode == :sync
       job
-    end
-
-    def self.work(queue = '')
-      Que.adapter.checkout do
-        with_locked_job(queue) do |job|
-          return :job_not_found if job.nil?
-
-          # Check that the job hasn't just been worked by another worker (it's possible to
-          # lock a job that's just been destroyed because pg locks don't obey MVCC). If it
-          # has been worked, act as if we've worked it.
-          return :job_worked unless job_exists?(job)
-
-          begin
-            class_for(job[:job_class]).new(job).run_and_destroy(*job[:args])
-          rescue => error
-            handle_job_failure(error, job)
-          end
-          :job_worked
-        end
-      end
-    rescue PG::Error => _error
-      # In the event that our Postgres connection is bad, we don't want that error to halt
-      # the work loop. Instead, we should let the work loop sleep and retry.
-      :error
-    end
-
-    # Set the error and retry with back-off
-    def self.handle_job_failure(error, job)
-      count = job[:error_count].to_i + 1
-
-      Que.execute(
-        :set_error, [
-          count,
-          count ** 4 + 3, # exponentially back off when retrying failures
-          "#{error.message}\n#{error.backtrace.join("\n")}",
-          *job.values_at(*JOB_INSTANCE_FIELDS)
-        ]
-      )
-    end
-
-    # These are set in the class definition of the Job, as instance variables on the class
-    def self.default_attrs
-      {
-        job_class: self.to_s,
-        queue:     @queue,
-        priority:  @priority,
-        run_at:    @run_at&.call,
-        retryable: true,
-      }
-    end
-
-    def self.class_for(string)
-      Que.constantize(string)
-    end
-
-    def self.with_locked_job(queue)
-      job = Que.execute(:lock_job, [queue]).first
-      yield job
-    ensure
-      Que.execute("SELECT pg_advisory_unlock($1)", [job[:job_id]]) if job
-    end
-
-    def self.job_exists?(job)
-      Que.execute(:check_job, job.values_at(*JOB_INSTANCE_FIELDS)).any?
     end
 
     def self.run(*args)
