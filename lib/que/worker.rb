@@ -24,12 +24,6 @@ module Que
       end
     end
 
-    def stop!
-      @stop = true
-    end
-
-    private
-
     def work
       Que.adapter.checkout do
         with_locked_job do |job|
@@ -53,6 +47,12 @@ module Que
       # the work loop. Instead, we should let the work loop sleep and retry.
       :error
     end
+
+    def stop!
+      @stop = true
+    end
+
+    private
 
     # Set the error and retry with back-off
     def handle_job_failure(error, job)
