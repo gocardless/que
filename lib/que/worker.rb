@@ -36,9 +36,16 @@ module Que
           return :job_worked unless job_exists?(job)
 
           begin
-            class_for(job[:job_class]).new(job).run_and_destroy(*job[:args])
+            klass = class_for(job[:job_class])
+            klass.new(job).run_and_destroy(*job[:args])
           rescue => error
-            handle_job_failure(error, job)
+            # For compatibility with que-failure, we need to allow failure handlers to be
+            # defined on the job class.
+            if klass.respond_to?(:handle_job_failure)
+              klass.handle_job_failure(error, job)
+            else
+              handle_job_failure(error, job)
+            end
           end
           :job_worked
         end
