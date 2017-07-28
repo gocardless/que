@@ -4,10 +4,11 @@ module Que
   class Worker
     # Defines the time a worker will wait before checking Postgres for its next job
     WAKE_INTERVAL = 5
+    DEFAULT_QUEUE = ''
     JOB_INSTANCE_FIELDS = %i[queue priority run_at job_id].freeze
 
-    def initialize(queue, wake_interval: WAKE_INTERVAL)
-      @queue  = queue || ''
+    def initialize(queue: DEFAULT_QUEUE, wake_interval: WAKE_INTERVAL)
+      @queue  = queue
       @wake_interval = wake_interval
     end
 
