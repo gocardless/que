@@ -1,13 +1,10 @@
+# frozen_string_literal: true
+
 require "spec_helper"
 
 RSpec.describe Que::Job do
   describe ".enqueue" do
     let(:run_at) { Time.now }
-
-    def postgres_now
-      now = ActiveRecord::Base.connection.execute("SELECT NOW();")[0]["now"]
-      Time.parse(now)
-    end
 
     it "adds job to que_jobs table" do
       expect { Que::Job.enqueue(:hello, run_at: run_at) }.

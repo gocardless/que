@@ -3,7 +3,10 @@ $LOAD_PATH << File.expand_path(__FILE__, '../lib')
 require 'que'
 require 'rspec'
 require 'active_record'
-require_relative "./fake_job"
+
+require_relative "./helpers/que_job"
+require_relative "./helpers/fake_job"
+require_relative "./helpers/exceptional_job"
 
 ActiveRecord::Base.establish_connection(
   adapter: 'postgresql',
@@ -17,10 +20,11 @@ ActiveRecord::Base.establish_connection(
 Que.connection  = ActiveRecord
 Que.migrate!
 
-class QueJob < ActiveRecord::Base
-  self.primary_key = 'job_id'
-end
-
 RSpec.configure do |config|
   config.before(:each) { QueJob.delete_all }
+end
+
+def postgres_now
+  now = ActiveRecord::Base.connection.execute("SELECT NOW();")[0]["now"]
+  Time.parse(now)
 end
