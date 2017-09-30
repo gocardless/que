@@ -3,6 +3,7 @@ $LOAD_PATH << File.expand_path(__FILE__, '../lib')
 require 'que'
 require 'rspec'
 require 'active_record'
+require_relative "./fake_job"
 
 ActiveRecord::Base.establish_connection(
   adapter: 'postgresql',
