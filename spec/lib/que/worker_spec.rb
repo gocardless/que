@@ -3,21 +3,8 @@
 require "spec_helper"
 
 RSpec.describe Que::Worker do
-  describe ".new" do
-    xit "sets a default queue and wake_interval" do
-      worker = described_class.new
-
-      expect(worker.queue).to eq(described_class::DEFAULT_QUEUE)
-      expect(worker.wake_interval).to eq(described_class::WAKE_INTERVAL)
-    end
-  end
-
   describe ".work" do
     subject { described_class.new.work }
-    before do
-      ExceptionalJob.log = []
-      ExceptionalJob::WithFailureHandler.log = []
-    end
 
     it "works a job if there's one to work" do
       FakeJob.enqueue(1)

@@ -62,7 +62,6 @@ RSpec.describe Que::Job do
       around do |example|
         Que.mode.tap do |old_mode|
           Que.mode = :sync
-          FakeJob.log = []
           example.run
           Que.mode = old_mode
         end
@@ -77,7 +76,6 @@ RSpec.describe Que::Job do
   end
 
   describe ".run" do
-    before { FakeJob.log = [] }
     it "news up a job and runs it" do
       FakeJob.run(1)
 

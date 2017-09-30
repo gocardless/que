@@ -21,7 +21,12 @@ Que.connection  = ActiveRecord
 Que.migrate!
 
 RSpec.configure do |config|
-  config.before(:each) { QueJob.delete_all }
+  config.before(:each) do
+    QueJob.delete_all
+    FakeJob.log = []
+    ExceptionalJob.log = []
+    ExceptionalJob::WithFailureHandler.log = []
+  end
 end
 
 def postgres_now
