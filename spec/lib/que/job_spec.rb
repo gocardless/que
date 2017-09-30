@@ -4,7 +4,7 @@ require "spec_helper"
 
 RSpec.describe Que::Job do
   describe ".enqueue" do
-    let(:run_at) { Time.now }
+    let(:run_at) { postgres_now }
 
     it "adds job to que_jobs table" do
       expect { Que::Job.enqueue(:hello, run_at: run_at) }.
@@ -36,7 +36,7 @@ RSpec.describe Que::Job do
       job_class: "A::Job",
       queue: "a_queue",
       priority: 10,
-      run_at: Time.now,
+      run_at: postgres_now,
       retryable: true
     }
 
@@ -110,7 +110,7 @@ RSpec.describe Que::Job do
     end
 
     it "permits setting run_at at a class level" do
-      run_at = Time.now
+      run_at = postgres_now
       job_class = Class.new(described_class) { @run_at = -> { run_at } }
 
       expect(job_class.default_attrs[:run_at]).to eq(run_at)
