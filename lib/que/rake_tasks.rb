@@ -16,25 +16,21 @@ namespace :que do
     end
 
     Que.logger.level  = Logger.const_get((ENV['QUE_LOG_LEVEL'] || 'INFO').upcase)
-    Que.worker_count  = (ENV['QUE_WORKER_COUNT'] || 4).to_i
-    Que.wake_interval = (ENV['QUE_WAKE_INTERVAL'] || 0.1).to_f
-    Que.queue_name    = ENV['QUE_QUEUE'] if ENV['QUE_QUEUE']
     Que.mode          = :async
+
+    worker = Que::Worker.new(
+      queue: ENV['QUE_QUEUE'],
+      wake_interval: ENV['QUE_WAKE_INTERVAL'],
+    )
 
     # When changing how signals are caught, be sure to test the behavior with
     # the rake task in tasks/safe_shutdown.rb.
 
-    stop = false
     %w( INT TERM ).each do |signal|
-      trap(signal) {stop = true}
+      trap(signal) { worker.stop! }
     end
 
-    at_exit do
-      $stdout.puts "Finishing Que's current jobs before exiting..."
-      Que.worker_count = 0
-      Que.mode = :off
-      $stdout.puts "Que's jobs finished, exiting..."
-    end
+    worker.work_loop
 
     loop do
       sleep 0.01
