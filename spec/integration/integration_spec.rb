@@ -44,14 +44,28 @@ RSpec.describe "multiple workers" do
   end
 
 
-  it "works jobs" do
-    FakeJob.enqueue(1)
+  context "with one worker and many jobs" do
+    it "works each job exactly once" do
+      10.times.map { |i| FakeJob.enqueue(i) }
 
-    expect(QueJob.count).to eq(1)
+      expect(QueJob.count).to eq(10)
 
-    with_workers(5) { wait_for_jobs_to_be_worked }
+      with_workers(1) { wait_for_jobs_to_be_worked }
 
-    expect(QueJob.count).to eq(0)
+      expect(QueJob.count).to eq(0)
+    end
+  end
+
+  context "with multiple workers contending over the same job" do
+    it "works that job exactly once" do
+      FakeJob.enqueue(1)
+
+      expect(QueJob.count).to eq(1)
+
+      with_workers(5) { wait_for_jobs_to_be_worked }
+
+      expect(QueJob.count).to eq(0)
+    end
   end
 
   context "with multiple jobs" do
