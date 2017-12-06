@@ -17,7 +17,7 @@ RSpec.describe "multiple workers" do
     end
   end
 
-  # Spawn multiple workers, ensuring they don't inherit our database connectino
+  # Spawn multiple workers, ensuring they don't inherit our database connection
   def create_workers(n)
     # We don't want the child processes to inherit our db connection, since they'll
     # close it when they exit and we'll no longer be able to use it.
@@ -42,7 +42,6 @@ RSpec.describe "multiple workers" do
       sleep 0.5
     end
   end
-
 
   context "with one worker and many jobs" do
     it "works each job exactly once" do

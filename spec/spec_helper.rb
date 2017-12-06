@@ -39,4 +39,3 @@ RSpec.configure do |config|
     ExceptionalJob::WithFailureHandler.log = []
   end
 end
-

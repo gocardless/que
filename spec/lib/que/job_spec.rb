@@ -46,7 +46,7 @@ RSpec.describe Que::Job do
         let(:args) { Hash[arg_keys.zip(fake_args.values_at(*arg_keys))] }
 
         it "handles them properly" do
-          described_class.enqueue(1, true, "foo", { a_real_arg: true}.merge(args))
+          described_class.enqueue(1, true, "foo", { a_real_arg: true }.merge(args))
           job = QueJob.last
 
           arg_keys.each do |key|
