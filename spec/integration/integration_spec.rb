@@ -3,35 +3,16 @@
 require "spec_helper"
 
 RSpec.describe "multiple workers" do
-  # Spawn a single Que worker in a separate process
-  # It will exit cleanly when sent SIGTERM or if it becomes an orphan process
-  # (i.e. our spec process dies)
-  def create_worker
-    fork do
-      # If this process becomes orphaned, it should stop que and exit
-      Thread.new { loop { worker.stop! && Kernel.exit! if Process.ppid == 1; sleep 1 } }
-      establish_database_connection
-      worker = Que::Worker.new
-      trap("TERM") { worker.stop! }
-      worker.work_loop
-    end
-  end
-
-  # Spawn multiple workers, ensuring they don't inherit our database connection
-  def create_workers(n)
-    # We don't want the child processes to inherit our db connection, since they'll
-    # close it when they exit and we'll no longer be able to use it.
-    ActiveRecord::Base.connection.disconnect!
-    workers = n.times.map { create_worker }
-    establish_database_connection
-    workers
-  end
-
   def with_workers(n)
-    workers = create_workers(n)
+    workers = Array.new(n) { Que::Worker.new }
+    worker_threads = workers.map { |worker| Thread.new { worker.work_loop } }
+
     yield
-    workers.each { |pid| Process.kill("TERM", pid) }
-    Process.waitall
+
+    workers.each(&:stop!)
+    worker_threads.each do |thread|
+      raise "timed out waiting for worker to finish!" unless thread.join(5)
+    end
   end
 
   # Wait for a maximum of [timeout] seconds for all jobs to be worked
@@ -39,7 +20,7 @@ RSpec.describe "multiple workers" do
     start = Time.now
     loop do
       break if QueJob.count == 0 || Time.now - start > timeout
-      sleep 0.5
+      sleep 0.1
     end
   end
 
