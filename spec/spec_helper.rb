@@ -3,6 +3,8 @@ $LOAD_PATH << File.expand_path(__FILE__, '../lib')
 require 'que'
 require 'rspec'
 require 'active_record'
+require 'pry'
+require 'thread'
 
 require_relative "./helpers/que_job"
 require_relative "./helpers/fake_job"
@@ -31,11 +33,30 @@ establish_database_connection
 Que.connection = ActiveRecord
 Que.migrate!
 
+class SpecLogger < Logger
+  def add(severity, progname, message = nil)
+    entries << message
+  end
+
+  def entries
+    @entries ||= Queue.new
+  end
+end
+
+Que.logger = SpecLogger.new(STDOUT)
+
 RSpec.configure do |config|
   config.before(:each) do
     QueJob.delete_all
+    # Collect log entries over the course of a spec
+    Que.logger.entries.clear
+
     FakeJob.log = []
     ExceptionalJob.log = []
     ExceptionalJob::WithFailureHandler.log = []
+  end
+
+  config.after(:each) do
+    puts Que.logger.entries
   end
 end

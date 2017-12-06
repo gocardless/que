@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'socket' # For hostname
+require 'json'
 
 module Que
   autoload :Adapters,   'que/adapters/base'
@@ -48,8 +49,8 @@ module Que
   end
 
   class << self
-    attr_accessor :error_handler
-    attr_writer :logger, :adapter, :log_formatter, :disable_prepared_statements, :json_converter
+    attr_accessor :error_handler, :logger
+    attr_writer :adapter, :disable_prepared_statements, :json_converter
 
     def connection=(connection)
       self.adapter =
@@ -110,21 +111,29 @@ module Que
       migrate! :version => 0
     end
 
-    def log(data)
-      level = data.delete(:level) || :info
-      data = {:lib => 'que', :hostname => Socket.gethostname, :pid => Process.pid, :thread => Thread.current.object_id}.merge(data)
+    # By default, we use a logger that outputs JSON. If a user wishes to change this, then
+    # they should set a logger with the appropriate formatter.
+    def logger
+      @logger ||= Logger.new(STDOUT, formatter: lambda do |severity, time, prog, message|
+        entry = message.merge(level: severity.upcase, timestamp: time)
+        entry.to_json + "\n"
+      end)
+    end
 
-      if (l = logger) && output = log_formatter.call(data)
-        l.send level, output
+    %i[debug info warn error fatal].each do |log_severity|
+      define_method(log_severity) do |message, **kwargs|
+        log(log_severity, message, **kwargs)
       end
     end
 
-    def logger
-      @logger.respond_to?(:call) ? @logger.call : @logger
-    end
-
-    def log_formatter
-      @log_formatter ||= JSON_MODULE.method(:dump)
+    def log(severity, message, **kwargs)
+      logger.public_send(severity, kwargs.merge(
+        lib: "que",
+        hostname: Socket.gethostname,
+        pid: Process.pid,
+        thread: Thread.current.object_id,
+        message: message,
+      ))
     end
 
     def disable_prepared_statements

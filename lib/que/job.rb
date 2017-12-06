@@ -37,6 +37,7 @@ module Que
     end
 
     def self.run(*args)
+      Que.info("running job", args:args)
       new(args: args).tap { |job| job.run(*args) }
     end
 
