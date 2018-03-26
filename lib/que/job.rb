@@ -99,14 +99,22 @@ module Que
         new(:args => args).tap { |job| job.run(*args) }
       end
 
-      def work(queue = '')
+      # We've introduced priority_threshold at GC to facilitate our transition from
+      # Softlayer to GCP. By providing Que with a priority threshold, we can configure
+      # workers in GCP to select an adjustable quantity of our job queue, in increasing
+      # priority order.
+      #
+      # This change should never be merged to master, as no one external to GC should ever
+      # have need of this functionality (I should think?). Regardless, the next change to
+      # Que should be merging the on-going refactor, which won't include this change.
+      def work(queue = '', priority_threshold = 0)
         # Since we're taking session-level advisory locks, we have to hold the
         # same connection throughout the process of getting a job, working it,
         # deleting it, and removing the lock.
         return_value =
           Que.adapter.checkout do
             begin
-              if job = Que.execute(:lock_job, [queue]).first
+              if job = Que.execute(:lock_job, [queue, priority_threshold]).first
                 # Edge case: It's possible for the lock_job query to have
                 # grabbed a job that's already been worked, if it took its MVCC
                 # snapshot while the job was processing, but didn't attempt the

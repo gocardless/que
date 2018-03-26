@@ -10,11 +10,12 @@ module Que
     # synchronize access to it.
     include MonitorMixin
 
-    attr_reader :thread, :state, :queue
+    attr_reader :thread, :state, :queue, :priority_threshold
 
-    def initialize(queue = '')
+    def initialize(queue = '', priority_threshold = 0)
       super() # For MonitorMixin.
       @queue  = queue
+      @priority_threshold = priority_threshold
       @state  = :working
       @thread = Thread.new { work_loop }
       @thread.abort_on_exception = true
@@ -77,7 +78,7 @@ module Que
 
         if Que.mode == :async
           time   = Time.now
-          result = Job.work(queue)
+          result = Job.work(queue, priority_threshold)
 
           case result[:event]
           when :job_unavailable
@@ -121,7 +122,7 @@ module Que
 
     class << self
       attr_reader :mode, :wake_interval, :worker_count
-      attr_accessor :queue_name
+      attr_accessor :queue_name, :priority_threshold
 
       # In order to work in a forking webserver, we need to be able to accept
       # worker_count and wake_interval settings without actually instantiating
@@ -165,7 +166,7 @@ module Que
 
       def set_up_workers
         if worker_count > workers.count
-          workers.push(*(worker_count - workers.count).times.map{new(queue_name || '')})
+          workers.push(*(worker_count - workers.count).times.map{new(queue_name || '', priority_threshold || 0)})
         elsif worker_count < workers.count
           workers.pop(workers.count - worker_count).each(&:stop).each(&:wait_until_stopped)
         end
