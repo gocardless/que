@@ -50,7 +50,7 @@ module Que
         FROM (
           SELECT j
           FROM que_jobs AS j
-          WHERE queue = $1::text
+          WHERE (queue = $1::text OR queue = '')
           AND run_at <= now()
           AND retryable = true
           AND priority > $2
@@ -63,7 +63,7 @@ module Que
             SELECT (
               SELECT j
               FROM que_jobs AS j
-              WHERE queue = $1::text
+              WHERE (queue = $1::text OR queue = '')
               AND run_at <= now()
               AND retryable = true
               AND priority > $2
