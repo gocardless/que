@@ -114,7 +114,18 @@ module Que
         return_value =
           Que.adapter.checkout do
             begin
-              if job = Que.execute(:lock_job, [queue, priority_threshold]).first
+              # For GC purposes, we want to attempt to find a job in our specified queue
+              # but then fallback on the default queue if nothing looks like it's
+              # available. We should only filter on priority_threshold with the default
+              # queue, while we select entirely from our specified queue. Then choose the
+              # job with the greatest priority.
+              job_from_queue = Que.execute(:lock_job, [queue, 0]).first
+              job_from_default = Que.execute(:lock_job, ['', priority_threshold]).first unless queue == ''
+
+              job, unlock_me = [job_from_queue, job_from_default].sort_by { |j| j&.fetch("priority") || Float::INFINITY }
+              Que.execute "SELECT pg_advisory_unlock($1)", [unlock_me["job_id"]] if unlock_me
+
+              if job
                 # Edge case: It's possible for the lock_job query to have
                 # grabbed a job that's already been worked, if it took its MVCC
                 # snapshot while the job was processing, but didn't attempt the
