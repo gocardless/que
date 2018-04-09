@@ -1,0 +1,27 @@
+version: 2
+jobs:
+  build:
+    working_directory: ~/que
+    docker:
+      - image: ruby:2.4.1
+        environment:
+          PGDATABASE: que-test
+          PGUSER: ubuntu
+          PGPASSWORD: password
+          PGHOST: localhost
+      - image: postgres:9.3.19
+        environment:
+          POSTGRES_DB: que-test
+          POSTGRES_USER: ubuntu
+          POSTGRES_PASSWORD: password
+    steps:
+      - checkout
+      - restore_cache:
+          key: gemfile-{{ .Branch }}-{{ checksum "Gemfile" }}
+      - run: bundle install
+      - save_cache:
+          key: gemfile-{{ .Branch }}-{{ checksum "Gemfile" }}
+          paths:
+            - "vendor/bundle"
+      - run: bundle exec ruby -r sequel -r ./lib/que -e 'Que.connection=Sequel.connect("postgres://localhost/que-test"); Que.migrate!'
+      - run: bundle exec rspec
