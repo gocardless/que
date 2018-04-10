@@ -19,7 +19,13 @@ namespace :que do
     Que.worker_count  = (ENV['QUE_WORKER_COUNT'] || 4).to_i
     Que.wake_interval = (ENV['QUE_WAKE_INTERVAL'] || 0.1).to_f
     Que.queue_name    = ENV['QUE_QUEUE'] if ENV['QUE_QUEUE']
-    Que.mode          = :async
+
+    # Supported in a custom feature branch for GC that will never be merged- use at your
+    # peril!
+    Que.priority_threshold = ENV.fetch('QUE_PRIORITY_THRESHOLD', 0).to_i
+
+    # This starts the workers- all config needs to be placed before this.
+    Que.mode = :async
 
     # When changing how signals are caught, be sure to test the behavior with
     # the rake task in tasks/safe_shutdown.rb.

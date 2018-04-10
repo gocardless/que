@@ -171,7 +171,7 @@ module Que
     end
 
     # Copy some of the Worker class' config methods here for convenience.
-    [:mode, :mode=, :worker_count, :worker_count=, :wake_interval, :wake_interval=, :queue_name, :queue_name=, :wake!, :wake_all!].each do |meth|
+    [:mode, :mode=, :worker_count, :worker_count=, :wake_interval, :wake_interval=, :priority_threshold, :priority_threshold=, :queue_name, :queue_name=, :wake!, :wake_all!].each do |meth|
       define_method(meth) { |*args| Worker.send(meth, *args) }
     end
   end

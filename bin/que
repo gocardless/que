@@ -73,6 +73,10 @@ Que.worker_count  = (options.worker_count  || ENV['QUE_WORKER_COUNT']  || Que.wo
 Que.wake_interval = (options.wake_interval || ENV['QUE_WAKE_INTERVAL'] || Que.wake_interval || 0.1).to_f
 Que.mode          = :async
 
+# Supported in a custom feature branch for GC that will never be merged- use at your
+# peril!
+Que.priority_threshold = ENV.fetch('QUE_PRIORITY_THRESHOLD', 0).to_i
+
 stop = false
 %w(INT TERM).each { |signal| trap(signal) { stop = true } }
 
