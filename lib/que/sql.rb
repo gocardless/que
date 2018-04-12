@@ -75,7 +75,8 @@ module Que
           ) AS t1
         )
       )
-      SELECT queue, priority, run_at, job_id, job_class, retryable, args, error_count
+      SELECT queue, priority, run_at, job_id, job_class, retryable, args, error_count,
+             extract(epoch from (now() - run_at)) as latency
       FROM jobs
       WHERE locked
       LIMIT 1

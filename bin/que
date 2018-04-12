@@ -16,6 +16,17 @@ OptionParser.new do |opts|
     options.wake_interval = wake_interval
   end
 
+  opts.on('-p', '--metrics-port [PORT]', Integer, "Enable metrics and expose them on this port") do |metrics_port|
+    options.metrics_port = metrics_port
+  end
+
+  opts.on('-m', '--metrics-labels [LABELS]', String, "Base labels for each prometheus metric, in key=value,... form") do |metrics_labels|
+    options.metrics_labels = metrics_labels.split(",").each_with_object({}) do |kv, labels|
+      key, value = kv.split("=")
+      labels[key.to_sym] = value
+    end
+  end
+
   opts.on('-l', '--log-level [LEVEL]', String, "Set level of Que's logger (debug, info, warn, error, fatal) (default: info)") do |log_level|
     options.log_level = log_level
   end
@@ -65,12 +76,15 @@ rescue NameError
   exit 1
 end
 
-queue_name    = options.queue_name    || ENV['QUE_QUEUE'] || Que::Job::DEFAULT_QUEUE
-wake_interval = options.wake_interval || ENV['QUE_WAKE_INTERVAL']&.to_f
+queue_name     = options.queue_name     || ENV['QUE_QUEUE'] || Que::Job::DEFAULT_QUEUE
+wake_interval  = options.wake_interval  || ENV['QUE_WAKE_INTERVAL']&.to_f
+metrics_labels = options.metrics_labels || {}
 
 $stdout.puts 'Starting worker...'
 
-worker = Que::Worker.new(queue: queue_name, wake_interval: wake_interval)
+worker = Que::Worker.
+  new(queue: queue_name, wake_interval: wake_interval, metrics_labels: metrics_labels)
+Thread.new { worker.metrics.expose(port: options.metrics_port) } if options.metrics_port
 
 %w[INT TERM].each { |signal| trap(signal) { worker.stop! } }
 
