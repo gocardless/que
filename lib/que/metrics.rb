@@ -98,7 +98,7 @@ module Que
       @jobs_latency_seconds_total.increment(labels, job[:latency])
 
       # Note that we've begun processing our job, so we can continually update the counter
-      set_running_job(labels, monotonic_now)
+      set_running_job(labels)
       block.call
 
     rescue
@@ -150,7 +150,11 @@ module Que
     # finished. Return the elapsed time for convenience.
     def set_running_job(job_labels, last_seen = monotonic_now)
       @running_job_lock.synchronize do
+        # Occassionally the value of elapsed will be computed as a negative number. We're
+        # not absolutely certain why, though we should ensure we never pass this to
+        # prometheus to avoid raising an exception.
         elapsed = last_seen - @running_job_last_seen if @running_job_last_seen
+        elapsed = 0.0 if elapsed && elapsed < 0.0
 
         @running_job_labels = job_labels
         @running_job_last_seen = last_seen
