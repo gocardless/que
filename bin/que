@@ -35,6 +35,10 @@ OptionParser.new do |opts|
     options.queue_name = queue_name
   end
 
+  opts.on('-t', '--priority-threshold [PRIORITY]', Integer, "Experimental, never intended to be merged") do |priority_threshold|
+    options.priority_threshold = priority_threshold
+  end
+
   opts.on('-v', '--version', "Show Que version") do
     require 'que'
     $stdout.puts "Que version #{Que::Version}"
@@ -76,14 +80,18 @@ rescue NameError
   exit 1
 end
 
-queue_name     = options.queue_name     || ENV['QUE_QUEUE'] || Que::Job::DEFAULT_QUEUE
-wake_interval  = options.wake_interval  || ENV['QUE_WAKE_INTERVAL']&.to_f
-metrics_labels = options.metrics_labels || {}
+queue_name         = options.queue_name         || ENV['QUE_QUEUE'] || Que::Job::DEFAULT_QUEUE
+wake_interval      = options.wake_interval      || ENV['QUE_WAKE_INTERVAL']&.to_f
+metrics_labels     = options.metrics_labels     || {}
+priority_threshold = options.priority_threshold || ENV['QUE_PRIORITY_THRESHOLD'].to_i
 
 $stdout.puts 'Starting worker...'
 
-worker = Que::Worker.
-  new(queue: queue_name, wake_interval: wake_interval, metrics_labels: metrics_labels)
+worker = Que::Worker.new(
+  queue: queue_name, wake_interval: wake_interval,
+  metrics_labels: metrics_labels,
+  priority_threshold: priority_threshold,
+)
 Thread.new { worker.metrics.expose(port: options.metrics_port) } if options.metrics_port
 
 %w[INT TERM].each { |signal| trap(signal) { worker.stop! } }

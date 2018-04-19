@@ -53,6 +53,7 @@ module Que
           WHERE queue = $1::text
           AND run_at <= now()
           AND retryable = true
+          AND priority > $2
           ORDER BY priority, run_at, job_id
           LIMIT 1
         ) AS t1
@@ -65,6 +66,7 @@ module Que
               WHERE queue = $1::text
               AND run_at <= now()
               AND retryable = true
+              AND priority > $2
               AND (priority, run_at, job_id) > (jobs.priority, jobs.run_at, jobs.job_id)
               ORDER BY priority, run_at, job_id
               LIMIT 1

@@ -10,11 +10,14 @@ module Que
     DEFAULT_QUEUE = ''
     JOB_INSTANCE_FIELDS = %i[queue priority run_at job_id].freeze
 
-    def initialize(queue: DEFAULT_QUEUE, wake_interval: WAKE_INTERVAL, metrics_labels: {})
+    def initialize(queue: DEFAULT_QUEUE, wake_interval: WAKE_INTERVAL, metrics_labels: {}, priority_threshold: 0)
       @queue  = queue
       @wake_interval = wake_interval
       @stop = false
       @metrics = Metrics.new(labels: metrics_labels)
+
+      # Supported in a custom GC branch that will never be merged.
+      @priority_threshold = priority_threshold
     end
 
     attr_reader :metrics
@@ -127,16 +130,37 @@ module Que
       )
     end
 
+
+    # We've introduced priority_threshold at GC to facilitate our transition from
+    # Softlayer to GCP. By providing Que with a priority threshold, we can configure
+    # workers in GCP to select an adjustable quantity of our job queue, in increasing
+    # priority order.
+    #
+    # We want to attempt locking a job in our specified queue and in the default queue.
+    # The job with the highest priority is the one we'll work. This will result in double
+    # locking jobs but the performance impact should be negligible.
     def with_locked_job
       # Separate the job acquisition from yielding the job, as we want to track the job
       # runtime separately.
-      job = @metrics.trace_acquire_job(queue: @queue) do
-        Que.execute(:lock_job, [@queue]).first
-      end
+      job_from_queue = acquire_job(@queue, 0)
+      job_from_default = acquire_job("", @priority_threshold) unless @queue == ""
+
+      # We've selected two candidate jobs, one from the default queue and the other from
+      # our specified queue. Now we order them by priority, and get rid of the less
+      # important job.
+      job, unlock_me = [job_from_queue, job_from_default].
+        sort_by { |j| j&.fetch("priority") || Float::INFINITY }
+      Que.execute "SELECT pg_advisory_unlock($1)", [unlock_me[:job_id]] if unlock_me
 
       yield job
     ensure
       Que.execute("SELECT pg_advisory_unlock($1)", [job[:job_id]]) if job
+    end
+
+    def acquire_job(queue, priority_threshold)
+      @metrics.trace_acquire_job(queue: queue) do
+        Que.execute(:lock_job, [queue, priority_threshold]).first
+      end
     end
 
     def job_exists?(job)

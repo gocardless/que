@@ -6,6 +6,7 @@ RSpec.describe "multiple workers" do
   def with_workers(n)
     workers = Array.new(n) { Que::Worker.new(wake_interval: 0.1) }
     worker_threads = workers.map { |worker| Thread.new { worker.work_loop } }
+    worker_threads.each { |t| t.abort_on_exception = true }
 
     yield
 
