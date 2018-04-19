@@ -32,7 +32,7 @@ module Que
         break if @stop
       end
     ensure
-      stop_trace.call
+      stop_trace.call if stop_trace
     end
 
     def work
