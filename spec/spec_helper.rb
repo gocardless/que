@@ -31,6 +31,9 @@ establish_database_connection
 Que.connection = ActiveRecord
 Que.migrate!
 
+# Ensure we have a logger, so that we can test the code paths that log
+Que.logger = Logger.new("/dev/null")
+
 RSpec.configure do |config|
   config.before(:each) do
     QueJob.delete_all

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "benchmark"
+require "que/metrics"
 
 module Que
   class Worker
@@ -9,14 +10,18 @@ module Que
     DEFAULT_QUEUE = ''
     JOB_INSTANCE_FIELDS = %i[queue priority run_at job_id].freeze
 
-    def initialize(queue: DEFAULT_QUEUE, wake_interval: WAKE_INTERVAL)
+    def initialize(queue: DEFAULT_QUEUE, wake_interval: WAKE_INTERVAL, metrics_labels: {})
       @queue  = queue
       @wake_interval = wake_interval
       @stop = false
+      @metrics = Metrics.new(labels: metrics_labels)
     end
+
+    attr_reader :metrics
 
     def work_loop
       return if @stop
+      stop_trace = @metrics.trace_start_work(queue: @queue)
 
       loop do
         case work
@@ -26,6 +31,8 @@ module Que
 
         break if @stop
       end
+    ensure
+      stop_trace.call
     end
 
     def work
@@ -45,7 +52,7 @@ module Que
           # this ID, and succeed, despite the job having already been worked.
           return :job_worked unless job_exists?(job)
 
-          log_keys = job.values_at("id", "priority", "args", "queue")
+          log_keys = job.slice("id", "priority", "args", "queue")
 
           begin
             Que.logger&.info(
@@ -57,7 +64,9 @@ module Que
 
             klass = class_for(job[:job_class])
             # TODO: _run -> run_and_destroy(*job[:args])
-            duration = Benchmark.measure { klass.new(job)._run }.real
+            duration = Benchmark.measure do
+              @metrics.trace_work_job(job) { klass.new(job)._run }
+            end.real
 
             Que.logger&.info(
               log_keys.merge(
@@ -113,7 +122,12 @@ module Que
     end
 
     def with_locked_job
-      job = Que.execute(:lock_job, [@queue]).first
+      # Separate the job acquisition from yielding the job, as we want to track the job
+      # runtime separately.
+      job = @metrics.trace_acquire_job(queue: @queue) do
+        Que.execute(:lock_job, [@queue]).first
+      end
+
       yield job
     ensure
       Que.execute("SELECT pg_advisory_unlock($1)", [job[:job_id]]) if job
