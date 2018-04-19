@@ -49,7 +49,7 @@ module Que
 
   class << self
     attr_accessor :error_handler
-    attr_writer :logger, :adapter, :log_formatter, :disable_prepared_statements, :json_converter
+    attr_writer :logger, :adapter, :disable_prepared_statements, :json_converter
 
     def connection=(connection)
       self.adapter =
@@ -110,21 +110,8 @@ module Que
       migrate! :version => 0
     end
 
-    def log(data)
-      level = data.delete(:level) || :info
-      data = {:lib => 'que', :hostname => Socket.gethostname, :pid => Process.pid, :thread => Thread.current.object_id}.merge(data)
-
-      if (l = logger) && output = log_formatter.call(data)
-        l.send level, output
-      end
-    end
-
     def logger
       @logger.respond_to?(:call) ? @logger.call : @logger
-    end
-
-    def log_formatter
-      @log_formatter ||= JSON_MODULE.method(:dump)
     end
 
     def disable_prepared_statements

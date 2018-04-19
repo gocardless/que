@@ -32,7 +32,7 @@ module Que
         break if @stop
       end
     ensure
-      stop_trace.call
+      stop_trace.call if stop_trace
     end
 
     def work
@@ -52,7 +52,8 @@ module Que
           # this ID, and succeed, despite the job having already been worked.
           return :job_worked unless job_exists?(job)
 
-          log_keys = job.slice("id", "priority", "args", "queue")
+          # job is a HashWithIndifferentAccess, so .to_h to avoid serialization issues
+          log_keys = job.slice("id", "priority", "args", "queue").to_h
 
           begin
             Que.logger&.info(
