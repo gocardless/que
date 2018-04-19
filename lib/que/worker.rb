@@ -52,8 +52,13 @@ module Que
           # this ID, and succeed, despite the job having already been worked.
           return :job_worked unless job_exists?(job)
 
-          # job is a HashWithIndifferentAccess, so .to_h to avoid serialization issues
-          log_keys = job.slice("id", "priority", "args", "queue").to_h
+          log_keys = {
+            id: job["job_id"],
+            priority: job["priority"],
+            queue: job["queue"],
+            job_class: job["job_class"],
+            job_error_count: job["error_count"],
+          }
 
           begin
             Que.logger&.info(
