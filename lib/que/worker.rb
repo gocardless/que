@@ -2,19 +2,26 @@
 
 require "benchmark"
 require "que/metrics"
+require "que/locker"
 
 module Que
   class Worker
     # Defines the time a worker will wait before checking Postgres for its next job
-    WAKE_INTERVAL = 5
     DEFAULT_QUEUE = ''
-    JOB_INSTANCE_FIELDS = %i[queue priority run_at job_id].freeze
+    DEFAULT_WAKE_INTERVAL = 5
+    DEFAULT_LOCK_CURSOR_EXPIRY = 0 # seconds
 
-    def initialize(queue: DEFAULT_QUEUE, wake_interval: WAKE_INTERVAL, metrics_labels: {})
-      @queue  = queue
+    def initialize(
+      queue: DEFAULT_QUEUE,
+      wake_interval: DEFAULT_WAKE_INTERVAL,
+      lock_cursor_expiry: DEFAULT_LOCK_CURSOR_EXPIRY,
+      metrics_labels: {}
+    )
+      @queue = queue
       @wake_interval = wake_interval
-      @stop = false
       @metrics = Metrics.new(labels: metrics_labels)
+      @locker = Locker.new(queue: queue, cursor_expiry: lock_cursor_expiry, metrics: metrics)
+      @stop = false
     end
 
     attr_reader :metrics
@@ -37,20 +44,8 @@ module Que
 
     def work
       Que.adapter.checkout do
-        with_locked_job do |job|
+        @locker.with_locked_job do |job|
           return :job_not_found if job.nil?
-
-          # Check that the job hasn't just been worked by another worker (it's possible to
-          # lock a job that's just been destroyed because pg locks don't obey MVCC). If it
-          # has been worked, act as if we've worked it.
-          #
-          # In explanation, what happens to cause this is a job is already being processed
-          # when we begin our lock query. This means the job row exists but is locked when
-          # we have materialized our job rows for use in the recursive query. At some
-          # point after this, but before we attempt to take our lock, the original worker
-          # destroys the job row and unlocks the advisory lock. We then attempt to lock
-          # this ID, and succeed, despite the job having already been worked.
-          return :job_worked unless job_exists?(job)
 
           log_keys = {
             id: job["job_id"],
@@ -122,25 +117,9 @@ module Que
           count,
           count ** 4 + 3, # exponentially back off when retrying failures
           "#{error.message}\n#{error.backtrace.join("\n")}",
-          *job.values_at(*JOB_INSTANCE_FIELDS)
+          *job.values_at(*Job::JOB_INSTANCE_FIELDS)
         ]
       )
-    end
-
-    def with_locked_job
-      # Separate the job acquisition from yielding the job, as we want to track the job
-      # runtime separately.
-      job = @metrics.trace_acquire_job(queue: @queue) do
-        Que.execute(:lock_job, [@queue]).first
-      end
-
-      yield job
-    ensure
-      Que.execute("SELECT pg_advisory_unlock($1)", [job[:job_id]]) if job
-    end
-
-    def job_exists?(job)
-      Que.execute(:check_job, job.values_at(*JOB_INSTANCE_FIELDS)).any?
     end
 
     def class_for(string)

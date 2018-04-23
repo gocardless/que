@@ -51,6 +51,7 @@ module Que
           SELECT j
           FROM que_jobs AS j
           WHERE queue = $1::text
+          AND job_id >= $2
           AND run_at <= now()
           AND retryable = true
           ORDER BY priority, run_at, job_id

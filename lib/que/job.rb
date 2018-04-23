@@ -5,6 +5,7 @@ module Que
   class Job
     # These are order dependent, as we use them in prepared statements
     JOB_OPTIONS = %i[queue priority run_at job_class retryable].freeze
+    JOB_INSTANCE_FIELDS = %i[queue priority run_at job_id].freeze
 
     # These are set in the class definition of the Job, as instance variables on the class
     def self.default_attrs

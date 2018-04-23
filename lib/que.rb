@@ -9,6 +9,8 @@ module Que
   autoload :SQL,        'que/sql'
   autoload :Version,    'que/version'
   autoload :Worker,     'que/worker'
+  autoload :Metrics,    'que/metrics'
+  autoload :Locker,     'que/locker'
 
   begin
     require 'multi_json'
