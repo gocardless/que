@@ -64,7 +64,7 @@ RSpec.describe Que::Worker do
         it "rescues it and returns an error" do
           FakeJob.enqueue(1)
 
-          expect(Que).to receive(:execute).with(:lock_job, ["", 0]).and_raise(PG::Error)
+          expect(Que).to receive(:execute).with(:lock_job, ["", 0, 0]).and_raise(PG::Error)
           expect(subject).to eq(:error)
         end
       end
