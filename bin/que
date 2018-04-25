@@ -20,6 +20,10 @@ OptionParser.new do |opts|
     options.metrics_port = metrics_port
   end
 
+  opts.on('-e', '--cursor-expiry [EXPIRY]', Integer, "Enable performance patch with cached cursors") do |cursor_expiry|
+    options.cursor_expiry = cursor_expiry
+  end
+
   opts.on('-m', '--metrics-labels [LABELS]', String, "Base labels for each prometheus metric, in key=value,... form") do |metrics_labels|
     options.metrics_labels = metrics_labels.split(",").each_with_object({}) do |kv, labels|
       key, value = kv.split("=")
@@ -79,11 +83,15 @@ end
 queue_name     = options.queue_name     || ENV['QUE_QUEUE'] || Que::Job::DEFAULT_QUEUE
 wake_interval  = options.wake_interval  || ENV['QUE_WAKE_INTERVAL']&.to_f
 metrics_labels = options.metrics_labels || {}
+cursor_expiry  = options.cursor_expiry  || 0
 
 $stdout.puts 'Starting worker...'
 
-worker = Que::Worker.
-  new(queue: queue_name, wake_interval: wake_interval, metrics_labels: metrics_labels)
+worker = Que::Worker.new(
+  queue: queue_name, wake_interval: wake_interval,
+  lock_cursor_expiry: cursor_expiry,
+  metrics_labels: metrics_labels
+)
 Thread.new { worker.metrics.expose(port: options.metrics_port) } if options.metrics_port
 
 %w[INT TERM].each { |signal| trap(signal) { worker.stop! } }
