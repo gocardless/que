@@ -1,0 +1,6 @@
+FROM ruby:2.5
+COPY . /que
+WORKDIR /que/benchmark
+RUN bundle install
+EXPOSE 8080
+CMD ["/bin/bash", "/que/benchmark/start-worker"]
