@@ -28,8 +28,8 @@ $ docker push gocardless/que-benchmark
 Once pushed, load the Kubernetes resources into your cluster:
 
 ```shell
-$ kubectl create namespace que-benchmarking
-$ kubectl --namespace apply -f benchmark/deployment.yaml
+$ kubectl create namespace que-benchmark
+$ kubectl --namespace que-benchmark apply -f benchmark/deployment.yaml
 deployment "que-postgres" configured
 configmap "que-postgres-init-scripts" configured
 service "que-postgres" configured
