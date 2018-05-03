@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+bundle exec que \
+  --metrics-labels "host=${HOSTNAME},env=benchmark" \
+  --metrics-port 8080 \
+  --wake-interval "${WAKE_INTERVAL}" \
+  --cursor-expiry "${CURSOR_EXPIRY}" \
+  --log-level INFO \
+  ./setup.rb

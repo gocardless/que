@@ -31,9 +31,12 @@ module Que
       stop_trace = @metrics.trace_start_work(queue: @queue)
 
       loop do
-        case work
-        when :job_not_found, :error then sleep(@wake_interval)
-        when :job_worked then nil # immediately find a new job to work
+        case event = work
+        when :job_not_found, :postgres_error
+          Que.logger&.info(event: "que.#{event}", wake_interval: @wake_interval)
+          @metrics.trace_sleeping(queue: @queue) { sleep(@wake_interval) }
+        when :job_worked
+          nil # immediately find a new job to work
         end
 
         break if @stop
@@ -99,7 +102,7 @@ module Que
     rescue PG::Error => _error
       # In the event that our Postgres connection is bad, we don't want that error to halt
       # the work loop. Instead, we should let the work loop sleep and retry.
-      :error
+      :postgres_error
     end
 
     def stop!

@@ -1,0 +1,164 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: que-postgres
+  labels:
+    app: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: que-postgres
+  template:
+    metadata:
+      labels:
+        name: que-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:9.4.17
+          imagePullPolicy: IfNotPresent
+          args: ["-c", "max_locks_per_transaction=1024"]
+          volumeMounts:
+            - name: que-postgres-init-scripts
+              mountPath: /docker-entrypoint-initdb.d
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: POSTGRES_USER
+              value: que
+            - name: POSTGRES_DB
+              value: que-benchmark
+            - name: POSTGRES_PASSWORD
+              value: password
+            - name: PGDATA
+              value: /var/lib/postgresql/main
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - exec pg_isready --host $POD_IP
+            failureThreshold: 6
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+      volumes:
+        - name: que-postgres-init-scripts
+          configMap:
+            name: que-postgres-init-scripts
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: que-postgres-init-scripts
+data:
+  structure.sql: |-
+    CREATE TABLE public.que_jobs (
+        priority smallint DEFAULT 100 NOT NULL,
+        run_at timestamp with time zone DEFAULT now() NOT NULL,
+        job_id bigint NOT NULL,
+        job_class text NOT NULL,
+        args json DEFAULT '[]'::json NOT NULL,
+        error_count integer DEFAULT 0 NOT NULL,
+        last_error text,
+        queue text DEFAULT ''::text NOT NULL,
+        retryable boolean DEFAULT true,
+        failed_at timestamp with time zone
+    )
+    WITH (
+      autovacuum_vacuum_scale_factor='0',
+      autovacuum_vacuum_threshold='10000',
+      autovacuum_vacuum_cost_limit='10000',
+      autovacuum_vacuum_cost_delay='10'
+    );
+
+    ALTER TABLE ONLY public.que_jobs
+      ADD CONSTRAINT que_jobs_pkey PRIMARY KEY (queue, priority, run_at, job_id);
+
+    CREATE SEQUENCE public.que_jobs_job_id_seq
+      START WITH 1
+      INCREMENT BY 1
+      NO MINVALUE
+      NO MAXVALUE
+      CACHE 1;
+
+    ALTER SEQUENCE public.que_jobs_job_id_seq OWNED BY public.que_jobs.job_id;
+    ALTER TABLE ONLY public.que_jobs
+      ALTER COLUMN job_id
+      SET DEFAULT nextval('public.que_jobs_job_id_seq'::regclass);
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: que-postgres
+spec:
+  selector:
+    name: que-postgres
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: postgres
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: que-benchmark
+  labels:
+    app: que
+    name: que-benchmark
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: que
+      name: que-benchmark
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+      labels:
+        app: que
+        name: que-benchmark
+    spec:
+      containers:
+        - name: worker
+          image: gocardless/que-benchmark:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: RACK_ENV
+              value: production
+            - name: PGUSER
+              value: que
+            - name: PGDATABASE
+              value: que-benchmark
+            - name: PGHOST
+              value: que-postgres
+            - name: PGPORT
+              value: "5432"
+            - name: PGPASSWORD
+              value: password
+            - name: WAKE_INTERVAL
+              value: "5"
+            - name: CURSOR_EXPIRY
+              value: "30"
+          resources:
+            limits:
+              memory: "250Mi"
+              cpu: "1500m"
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 8080
+            initialDelaySeconds: 5
+            timeoutSeconds: 1
