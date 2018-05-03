@@ -1,0 +1,51 @@
+#!/usr/bin/env ruby
+
+require_relative "setup"
+
+unless ARGV.count == 3
+  puts(<<-USAGE)
+
+  Desc:  Repopulate que_jobs with a random selection of jobs
+  Usage: seed-jobs <number-of-jobs> <duration-range> <priority-range>
+  Examples...
+
+    seed-jobs 100_000 0..0.5 1..25
+    seed-jobs 5_000 0 1
+
+  USAGE
+end
+
+def parse_range(token)
+  [*Range.new(*token.split("..").map(&:to_i))] rescue [token.to_i]
+end
+
+now = Time.now
+no_of_jobs = ARGV[0].to_i
+duration_range = parse_range(ARGV[1])
+priority_range = parse_range(ARGV[2])
+
+Que.logger.info(msg: "Truncating que_jobs table")
+ActiveRecord::Base.connection.execute("TRUNCATE que_jobs;")
+
+Que.logger.info(
+  msg: "Seeding database",
+  now: now,
+  no_of_jobs: no_of_jobs,
+  duration_range: duration_range,
+  priority_range: priority_range,
+)
+
+ActiveRecord::Base.transaction do
+  no_of_jobs.times do
+    Jobs::Sleep.enqueue(
+      duration_range[Random.rand(duration_range.size)],
+      run_at: now + Random.rand,
+      priority: priority_range[Random.rand(priority_range.size)],
+    )
+  end
+end
+
+Que.logger.info(
+  msg: "Finished seeding database",
+  jobs_in_table: QueJob.count,
+)

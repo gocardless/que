@@ -84,13 +84,13 @@ rescue NameError
   exit 1
 end
 
-queue_name         = options.queue_name         || ENV['QUE_QUEUE'] || Que::Job::DEFAULT_QUEUE
-wake_interval      = options.wake_interval      || ENV['QUE_WAKE_INTERVAL']&.to_f
-metrics_labels     = options.metrics_labels     || {}
-priority_threshold = options.priority_threshold || ENV['QUE_PRIORITY_THRESHOLD'].to_i
-cursor_expiry      = options.cursor_expiry  || 0
+queue_name          = options.queue_name     || ENV['QUE_QUEUE'] || Que::Worker::DEFAULT_QUEUE
+wake_interval       = options.wake_interval  || ENV['QUE_WAKE_INTERVAL']&.to_f
+metrics_labels      = options.metrics_labels || {}
+priority_threshold  = options.priority_threshold || ENV['QUE_PRIORITY_THRESHOLD'].to_i
+cursor_expiry       = options.cursor_expiry  || 0
 
-$stdout.puts 'Starting worker...'
+Que.logger.info(msg: 'Starting worker', event: 'que.worker.start')
 
 worker = Que::Worker.new(
   queue: queue_name, wake_interval: wake_interval,
@@ -104,4 +104,4 @@ Thread.new { worker.metrics.expose(port: options.metrics_port) } if options.metr
 
 worker.work_loop
 
-$stdout.puts 'Finished work, exiting.'
+Que.logger.info(msg: 'Finished work, exiting', event: 'que.worker.finish')

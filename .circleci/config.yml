@@ -1,15 +1,16 @@
+---
 version: 2
 jobs:
   build:
     working_directory: ~/que
     docker:
-      - image: ruby:2.4.1
+      - image: ruby:2.5.0
         environment:
           PGDATABASE: que-test
           PGUSER: ubuntu
           PGPASSWORD: password
           PGHOST: localhost
-      - image: postgres:9.3.19
+      - image: postgres:9.4.17
         environment:
           POSTGRES_DB: que-test
           POSTGRES_USER: ubuntu

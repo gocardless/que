@@ -21,13 +21,30 @@ module Que
       @cursor_expires_at = monotonic_now
     end
 
-    # Acquire a job for the period of running the given block.
+    # Acquire a job for the period of running the given block. Returning nil without
+    # calling the given block will cause the worker to immediately retry locking a job-
+    # yielding with nil means there were no jobs to lock, and the worker will pause before
+    # retrying.
     def with_locked_job
       reset_cursor if cursor_expired?
 
+      job = lock_job
+
+      # Becuase we were using a cursor when we tried to lock this job, if we fail to find
+      # a job it is not necessarily the case that there aren't jobs in the queue. We may
+      # have been excluding candidate jobs due to the cursor that are now due to be
+      # worked.
+      #
+      # We should attempt to lock again after resetting our cursor to make sure we include
+      # jobs that were excluded in the first attempt.
+      if job.nil? && @cursor != 0
+        reset_cursor
+        job = lock_job
+      end
+
       # Check that the job hasn't just been worked by another worker (it's possible to
       # lock a job that's just been destroyed because pg locks don't obey MVCC). If it has
-      # been worked, act as if we've worked it.
+      # been worked, return nil to immediately retry locking.
       #
       # This can happen with jobs that are already being worked when we begin our lock
       # query. The job row exists but is locked at the point that we materialise our job
@@ -38,15 +55,17 @@ module Que
       #
       # To avoid working the job a second time, we check whether it exists again after
       # acquiring the lock on it.
-      job = lock_job
-      reset_cursor unless job # if no job was found, we should reset the cursor
-      job = nil unless exists?(job)
+      return if job && !exists?(job)
 
       @cursor = job[:job_id] if job
 
       yield job
     ensure
-      Que.execute("SELECT pg_advisory_unlock($1)", [job[:job_id]]) if job
+      if job
+        @metrics.trace_unlock_job(queue: @queue) do
+          Que.execute("SELECT pg_advisory_unlock($1)", [job[:job_id]])
+        end
+      end
     end
 
     private
@@ -57,6 +76,12 @@ module Que
       end
     end
 
+    def exists?(job)
+      @metrics.trace_job_exists(queue: @queue) do
+        Que.execute(:check_job, job.values_at(*Job::JOB_INSTANCE_FIELDS)).any? if job
+      end
+    end
+
     def cursor_expired?
       @cursor_expires_at < monotonic_now
     end
@@ -64,10 +89,6 @@ module Que
     def reset_cursor
       @cursor = 0
       @cursor_expires_at = monotonic_now + @cursor_expiry
-    end
-
-    def exists?(job)
-      Que.execute(:check_job, job.values_at(*Job::JOB_INSTANCE_FIELDS)).any? if job
     end
 
     def monotonic_now
