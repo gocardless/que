@@ -115,7 +115,7 @@ metadata:
     app: que
     name: que-benchmark
 spec:
-  replicas: 4
+  replicas: 3
   selector:
     matchLabels:
       app: que
@@ -152,6 +152,66 @@ spec:
               value: "5"
             - name: CURSOR_EXPIRY
               value: "30"
+            - name: QUEUE_NAME
+              value: "default"
+          resources:
+            limits:
+              memory: "250Mi"
+              cpu: "1500m"
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 8080
+            initialDelaySeconds: 5
+            timeoutSeconds: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: que-benchmark-webhooks
+  labels:
+    app: que
+    name: que-benchmark-webhooks
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: que
+      name: que-benchmark-webhooks
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+      labels:
+        app: que
+        name: que-benchmark-webhooks
+    spec:
+      containers:
+        - name: worker-webhooks
+          image: gocardless/que-benchmark:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: RACK_ENV
+              value: production
+            - name: PGUSER
+              value: que
+            - name: PGDATABASE
+              value: que-benchmark
+            - name: PGHOST
+              value: que-postgres
+            - name: PGPORT
+              value: "5432"
+            - name: PGPASSWORD
+              value: password
+            - name: WAKE_INTERVAL
+              value: "5"
+            - name: CURSOR_EXPIRY
+              value: "30"
+            - name: QUEUE_NAME
+              value: "webhooks"
           resources:
             limits:
               memory: "250Mi"
