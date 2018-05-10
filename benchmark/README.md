@@ -48,6 +48,9 @@ que-benchmark-79c779b6db-z7jm4   1/1       Running   0          43m
 que-postgres-5c5d69949d-rjpl6    1/1       Running   0          4h
 ```
 
+
+select queue, count(*) from que_jobs group by 1;
+
 You can now exec into one of the que containers to kickoff a benchmark:
 
 ```
