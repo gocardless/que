@@ -7,8 +7,52 @@ require "prometheus/middleware/exporter"
 
 module Que
   class Metrics
-    def initialize(labels: {})
-      @registry = Prometheus::Client::Registry.new
+    def self.register_metrics(registry)
+      return registry if registry.exist?(:que_jobs_worked_total)
+
+      registry.instance_eval do
+        counter(:que_jobs_worked_total, "Counter for all jobs processed")
+        counter(:que_jobs_error_total, "Counter for all jobs that were run but errored")
+        counter(:que_jobs_worked_seconds_total, "Sum of the time taken processing each job class")
+        counter(:que_jobs_latency_seconds_total, "Sum of time spent by job and priority waiting in queue")
+        counter(:que_worker_sleeping_total, "Number of times worker slept due to no jobs")
+        counter(:que_worker_sleeping_seconds_total, "Time spent sleeping, because no jobs")
+        counter(:que_worker_running_seconds_total, "Time since starting to work jobs")
+        counter(:que_worker_job_exists__total, "Counter of number of attempts to check job existance in locking")
+        counter(:que_worker_job_exists_seconds_total, "Time spent checking if job exists as part of locking")
+        counter(:que_worker_job_unlock_total, "Counter of number of advisory unlocks")
+        counter(:que_worker_job_unlock_seconds_total, "Time spent unlocking advisory job locks")
+        counter(:que_worker_job_acquire_total, "Counter of number of attempts to acquire jobs")
+        counter(:que_worker_job_acquire_seconds_total, "Sum of time taken to acquire jobs")
+
+        self
+      end
+    end
+
+    # Start a webserver on the given port to expose Prometheus metrics. This should be
+    # given the registry that is used across all workers, to provide metrics for every
+    # worker thread.
+    def self.expose(registry, port: 8080)
+      Que.logger&.info(
+        event: "serving_metrics",
+        msg: "Serving /metrics endpoint",
+        port: port,
+      )
+
+      Rack::Handler::WEBrick.run(
+        Prometheus::Middleware::Exporter.
+          new(Proc.new { [200, {}, ["healthy"]] }, registry: registry), {
+            Port: port,
+            BindAddress: "0.0.0.0",
+            Logger: WEBrick::Log.new("/dev/null"),
+            AccessLog: [],
+          }
+      )
+    end
+
+    def initialize(labels: {}, registry: Prometheus::Client.registry)
+      @registry = self.class.register_metrics(registry)
+      @metrics = @registry.metrics.each_with_object({}) { |m, ms| ms[m.name] = m }
       @base_labels = labels
 
       # These instance variables all relate to internal running job metrics. They are used
@@ -20,64 +64,6 @@ module Que
 
       # When we get garbage collected, stop the job tracker thread.
       ObjectSpace.define_finalizer(self) { @running_job_tracker_stop.call }
-
-      @jobs_worked_total = register_counter(
-        :que_jobs_worked_total, "Counter for all jobs processed"
-      )
-      @jobs_error_total = register_counter(
-        :que_jobs_error_total, "Counter for all jobs that were run but errored"
-      )
-      @jobs_worked_seconds_total = register_counter(
-        :que_jobs_worked_seconds_total, "Sum of the time taken processing each job class"
-      )
-      @jobs_latency_seconds_total = register_counter(
-        :que_jobs_latency_seconds_total, "Sum of time spent by job and priority waiting in queue"
-      )
-      @worker_sleeping_total = register_counter(
-        :que_worker_sleeping_total, "Number of times worker slept due to no jobs"
-      )
-      @worker_sleeping_seconds_total = register_counter(
-        :que_worker_sleeping_seconds_total, "Time spent sleeping, because no jobs"
-      )
-      @worker_running_seconds_total = register_counter(
-        :que_worker_running_seconds_total, "Time since starting to work jobs"
-      )
-      @worker_job_exists_total = register_counter(
-        :que_worker_job_exists__total, "Counter of number of attempts to check job existance in locking"
-      )
-      @worker_job_exists_seconds_total = register_counter(
-        :que_worker_job_exists_seconds_total, "Time spent checking if job exists as part of locking"
-      )
-      @worker_job_unlock_total = register_counter(
-        :que_worker_job_unlock_total, "Counter of number of advisory unlocks"
-      )
-      @worker_job_unlock_seconds_total = register_counter(
-        :que_worker_job_unlock_seconds_total, "Time spent unlocking advisory job locks"
-      )
-      @worker_job_acquire_total = register_counter(
-        :que_worker_job_acquire_total, "Counter of number of attempts to acquire jobs"
-      )
-      @worker_job_acquire_seconds_total = register_counter(
-        :que_worker_job_acquire_seconds_total, "Sum of time taken to acquire jobs"
-      )
-    end
-
-    def expose(port: 8080)
-      Que.logger&.info(
-        event: "serving_metrics",
-        msg: "Serving /metrics endpoint",
-        port: port,
-      )
-
-      Rack::Handler::WEBrick.run(
-        Prometheus::Middleware::Exporter.
-          new(Proc.new { [200, {}, ["healthy"]] }, registry: @registry), {
-            Port: port,
-            BindAddress: "0.0.0.0",
-            Logger: WEBrick::Log.new("/dev/null"),
-            AccessLog: [],
-          }
-      )
     end
 
     def trace_start_work(labels = {})
@@ -88,7 +74,8 @@ module Que
 
         until stop
           timestamp = monotonic_now
-          @worker_running_seconds_total.increment(labels, timestamp - last_timestamp)
+          @metrics[:que_worker_running_seconds_total].
+            increment(@base_labels.merge(labels), timestamp - last_timestamp)
           last_timestamp = timestamp
 
           sleep(1) # delay the next update for 1s
@@ -101,8 +88,8 @@ module Que
     def trace_sleeping(labels, &block)
       instrument(
         labels,
-        @worker_sleeping_total,
-        @worker_sleeping_seconds_total,
+        @metrics[:que_worker_sleeping_total],
+        @metrics[:que_worker_sleeping_seconds_total],
         &block
       )
     end
@@ -110,8 +97,8 @@ module Que
     def trace_acquire_job(labels, &block)
       instrument(
         labels,
-        @worker_job_acquire_total,
-        @worker_job_acquire_seconds_total,
+        @metrics[:que_worker_job_acquire_total],
+        @metrics[:que_worker_job_acquire_seconds_total],
         &block
       )
     end
@@ -119,8 +106,8 @@ module Que
     def trace_unlock_job(labels, &block)
       instrument(
         labels,
-        @worker_job_unlock_total,
-        @worker_job_unlock_seconds_total,
+        @metrics[:que_worker_job_unlock_total],
+        @metrics[:que_worker_job_unlock_seconds_total],
         &block
       )
     end
@@ -128,8 +115,8 @@ module Que
     def trace_job_exists(labels, &block)
       instrument(
         labels,
-        @worker_job_exists_total,
-        @worker_job_exists_seconds_total,
+        @metrics[:que_worker_job_exists_total],
+        @metrics[:que_worker_job_exists_seconds_total],
         &block
       )
     end
@@ -141,29 +128,25 @@ module Que
       labels = {
         job_class: job["job_class"], priority: job["priority"], queue: job["queue"],
       }
-      @jobs_latency_seconds_total.increment(labels, job[:latency])
+      @metrics[:que_jobs_latency_seconds_total].increment(labels, job[:latency])
 
       # Note that we've begun processing our job, so we can continually update the counter
       set_running_job(labels)
       block.call
 
     rescue
-      @jobs_error_total.increment(labels, 1)
+      @metrics[:que_jobs_error_total].increment(labels, 1)
       raise
 
     ensure
       # Once finished with our job, increment our counter by what elapsed between us and
       # the last run of our job tracker. We ensure this so that we track duration of jobs
       # that raise exceptions.
-      @jobs_worked_seconds_total.increment(labels, set_running_job(nil))
-      @jobs_worked_total.increment(labels, 1)
+      @metrics[:que_jobs_worked_seconds_total].increment(labels, set_running_job(nil))
+      @metrics[:que_jobs_worked_total].increment(labels, 1)
     end
 
     private
-
-    def register_counter(name, description)
-      @registry.counter(name, description, @base_labels)
-    end
 
     # If we only track job runtime by incrementing the counter at the end of the job being
     # run, then long jobs will update counters by large amounts only once. This method
@@ -178,7 +161,7 @@ module Que
             next unless @running_job_labels
 
             timestamp = monotonic_now
-            @jobs_worked_seconds_total.
+            @metrics[:que_jobs_worked_seconds_total].
               increment(@running_job_labels, timestamp - @running_job_last_seen)
 
             @running_job_last_seen = timestamp
@@ -221,11 +204,11 @@ module Que
     def instrument(labels, counter, duration_counter)
       result = nil
       duration = Benchmark.measure { result = yield }.real
-      duration_counter&.increment(labels, duration)
+      duration_counter&.increment(@base_labels.merge(labels), duration)
 
       result
     ensure
-      counter&.increment(labels, 1)
+      counter&.increment(@base_labels.merge(labels), 1)
     end
   end
 end

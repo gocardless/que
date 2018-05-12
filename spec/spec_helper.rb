@@ -4,11 +4,12 @@ require 'que'
 require 'rspec'
 require 'active_record'
 
-require_relative "./helpers/que_job"
-require_relative "./helpers/fake_job"
-require_relative "./helpers/exceptional_job"
-require_relative "./helpers/user"
 require_relative "./helpers/create_user"
+require_relative "./helpers/exceptional_job"
+require_relative "./helpers/fake_job"
+require_relative "./helpers/que_job"
+require_relative "./helpers/sleep_job"
+require_relative "./helpers/user"
 
 def postgres_now
   now = ActiveRecord::Base.connection.execute("SELECT NOW();")[0]["now"]
@@ -40,5 +41,11 @@ RSpec.configure do |config|
     FakeJob.log = []
     ExceptionalJob.log = []
     ExceptionalJob::WithFailureHandler.log = []
+
+    # In normal runtime we'll new-up metrics with consistent labels, but in tests we'll
+    # create workers with all sorts of configurations. Ensure we clear the registry to
+    # prevent mis-matched metric labels from raising exceptions from the incompatible
+    # configurations.
+    Prometheus::Client.registry.instance_eval { @metrics.clear }
   end
 end
