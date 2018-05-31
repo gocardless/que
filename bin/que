@@ -94,7 +94,7 @@ queue_name          = options.queue_name         || ENV['QUE_QUEUE'] || Que::Wor
 wake_interval       = options.wake_interval      || ENV['QUE_WAKE_INTERVAL']&.to_f
 metrics_labels      = options.metrics_labels     || {}
 cursor_expiry       = options.cursor_expiry      || 0
-timeout             = options.timeout            || 0
+timeout             = options.timeout
 timeout_message     = options.timeout_message    || ""
 
 Que.logger.info(msg: 'Starting worker', event: 'que.worker.start')
@@ -113,7 +113,7 @@ stop = false
 
 worker_thread = Thread.new { worker.work_loop }
 
-loop { sleep 0.1 until stop }
+sleep 0.1 until stop
 
 Que.logger.info(msg: 'Waiting for worker to finish', event: 'que.worker.finish_wait')
 
