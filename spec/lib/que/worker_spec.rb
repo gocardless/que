@@ -6,16 +6,45 @@ RSpec.describe Que::Worker do
   describe ".work" do
     subject { described_class.new.work }
 
-    it "works a job if there's one to work" do
-      FakeJob.enqueue(1)
-
-      expect(subject).to eq(:job_worked)
-      expect(FakeJob.log).to eq([1])
-      expect(QueJob.count).to eq(0)
-    end
-
     it "returns job_not_found if there's no job to work" do
       expect(subject).to eq(:job_not_found)
+    end
+
+    context "when there's a job to work" do
+      let!(:job) { FakeJob.enqueue(1) }
+
+      it "works the job" do
+        expect(subject).to eq(:job_worked)
+        expect(FakeJob.log).to eq([1])
+        expect(QueJob.count).to eq(0)
+      end
+
+      it "logs the work" do
+        expect(Que.logger).to receive(:info).
+          with(hash_including({
+            event: "job_begin",
+            id: job.attrs["job_id"],
+            job_class: "FakeJob",
+            job_error_count: 0,
+            msg: "Job acquired, beginning work",
+            priority: 100,
+            queue: "",
+          }))
+
+        expect(Que.logger).to receive(:info).
+          with(hash_including({
+            duration: kind_of(Float),
+            event: "job_worked",
+            id: job.attrs["job_id"],
+            job_class: "FakeJob",
+            job_error_count: 0,
+            msg: "Successfully worked job",
+            priority: 100,
+            queue: "",
+          }))
+
+        subject
+      end
     end
 
     context "when a job raises an exception" do
@@ -23,6 +52,26 @@ RSpec.describe Que::Worker do
         ExceptionalJob.enqueue(1)
 
         expect(subject).to eq(:job_worked)
+      end
+
+      it "logs the work" do
+        ExceptionalJob.enqueue(1)
+
+        expect(Que.logger).to receive(:info).
+          with(hash_including({
+            event: "job_begin",
+            job_class: "ExceptionalJob",
+            msg: "Job acquired, beginning work",
+          }))
+
+        expect(Que.logger).to receive(:error).
+          with(hash_including({
+            event: "job_error",
+            job_class: "ExceptionalJob",
+            msg: "Job failed with error",
+          }))
+
+        subject
       end
 
       context "and the job has a failure handler" do
