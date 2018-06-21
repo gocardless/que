@@ -23,26 +23,26 @@ RSpec.describe Que::Worker do
         expect(Que.logger).to receive(:info).
           with(hash_including({
             event: "que_job.job_begin",
-            id: job.attrs["job_id"],
             handler: "FakeJob",
             job_class: "FakeJob",
             job_error_count: 0,
             msg: "Job acquired, beginning work",
             priority: 100,
             queue: "",
+            que_job_id: job.attrs["job_id"],
           }))
 
         expect(Que.logger).to receive(:info).
           with(hash_including({
             duration: kind_of(Float),
             event: "que_job.job_worked",
-            id: job.attrs["job_id"],
             handler: "FakeJob",
             job_class: "FakeJob",
             job_error_count: 0,
             msg: "Successfully worked job",
             priority: 100,
             queue: "",
+            que_job_id: job.attrs["job_id"],
           }))
 
         subject

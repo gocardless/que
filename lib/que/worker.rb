@@ -51,12 +51,12 @@ module Que
           return :job_not_found if job.nil?
 
           log_keys = {
-            id: job["job_id"],
             priority: job["priority"],
             queue: job["queue"],
             handler: job["job_class"],
             job_class: job["job_class"],
             job_error_count: job["error_count"],
+            que_job_id: job["job_id"],
           }
 
           begin
