@@ -22,7 +22,7 @@ RSpec.describe Que::Worker do
       it "logs the work" do
         expect(Que.logger).to receive(:info).
           with(hash_including({
-            event: "job_begin",
+            event: "que_job.job_begin",
             id: job.attrs["job_id"],
             handler: "FakeJob",
             job_class: "FakeJob",
@@ -35,7 +35,7 @@ RSpec.describe Que::Worker do
         expect(Que.logger).to receive(:info).
           with(hash_including({
             duration: kind_of(Float),
-            event: "job_worked",
+            event: "que_job.job_worked",
             id: job.attrs["job_id"],
             handler: "FakeJob",
             job_class: "FakeJob",
@@ -61,7 +61,7 @@ RSpec.describe Que::Worker do
 
         expect(Que.logger).to receive(:info).
           with(hash_including({
-            event: "job_begin",
+            event: "que_job.job_begin",
             handler: "ExceptionalJob",
             job_class: "ExceptionalJob",
             msg: "Job acquired, beginning work",
@@ -69,7 +69,7 @@ RSpec.describe Que::Worker do
 
         expect(Que.logger).to receive(:error).
           with(hash_including({
-            event: "job_error",
+            event: "que_job.job_error",
             handler: "ExceptionalJob",
             job_class: "ExceptionalJob",
             msg: "Job failed with error",

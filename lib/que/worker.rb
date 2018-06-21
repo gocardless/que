@@ -62,7 +62,7 @@ module Que
           begin
             Que.logger&.info(
               log_keys.merge(
-                event: "job_begin",
+                event: "que_job.job_begin",
                 msg: "Job acquired, beginning work",
               )
             )
@@ -75,7 +75,7 @@ module Que
 
             Que.logger&.info(
               log_keys.merge(
-                event: "job_worked",
+                event: "que_job.job_worked",
                 msg: "Successfully worked job",
                 duration: duration,
               )
@@ -83,7 +83,7 @@ module Que
           rescue => error
             Que.logger&.error(
               log_keys.merge(
-                event: "job_error",
+                event: "que_job.job_error",
                 msg: "Job failed with error",
                 error: error.to_s,
               )
