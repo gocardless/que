@@ -21,10 +21,6 @@ module Que
       @wake_interval = wake_interval
       @metrics = Metrics.new(labels: metrics_labels)
       @locker = Locker.new(queue: queue, cursor_expiry: lock_cursor_expiry, metrics: metrics)
-      @locker_default = Locker.new(
-        queue: "", cursor_expiry: lock_cursor_expiry, metrics: metrics,
-        priority_threshold: priority_threshold,
-      )
       @stop = false
     end
 
@@ -51,7 +47,7 @@ module Que
 
     def work
       Que.adapter.checkout do
-        with_locked_job do |job|
+        @locker.with_locked_job do |job|
           return :job_not_found if job.nil?
 
           log_keys = {
@@ -128,32 +124,6 @@ module Que
           *job.values_at(*Job::JOB_INSTANCE_FIELDS)
         ]
       )
-    end
-
-    # We've introduced priority_threshold at GC to facilitate our transition from
-    # Softlayer to GCP. By providing Que with a priority threshold, we can configure
-    # workers in GCP to select an adjustable quantity of our job queue, in increasing
-    # priority order.
-    #
-    # We want to attempt locking a job in our specified queue and in the default queue.
-    # The job with the highest priority is the one we'll work. This will result in double
-    # locking jobs but the performance impact should be negligible.
-    def with_locked_job
-      @locker.with_locked_job do |job_specific|
-        @locker_default.with_locked_job do |job_default|
-          # We've selected two candidate jobs, one from the default queue and the other
-          # from our specified queue. Now we order them by priority, and get rid of the
-          # less important job.
-          job, unlock_me = [job_specific, job_default].
-            sort_by { |j| j&.fetch("priority") || Float::INFINITY }
-
-          # Unlock the one we don't want immediately, regardless of SQL warnings.
-          Que.execute "SELECT pg_advisory_unlock($1)", [unlock_me[:job_id]] if unlock_me
-
-          yield job
-        end
-      end
-
     end
 
     def class_for(string)
