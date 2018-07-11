@@ -19,8 +19,8 @@ stops the process, the strategy cannot update the job to indicate failure.
 To get around this, Que supports setting a worker timeout, which is an amount of
 time that it will wait, after receiving a SIGTERM or SIGINT, for a worker to
 stop. If the worker has not stopped within that time, Que will raise a
-`QueJobTimeoutError` exception, which will be handled by the `NoRetry` strategy
-failure handler and ensure that the job is properly marked as failed.
+`Que::JobTimeoutError` exception, which will be handled by the `NoRetry`
+strategy failure handler and ensure that the job is properly marked as failed.
 
 The timeout can be specified in an argument to the `que` executable, as well as
 a message to send with the exception. Run `bin/que --help` for more information.
