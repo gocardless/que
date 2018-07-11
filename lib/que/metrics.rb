@@ -125,9 +125,9 @@ module Que
     # for debugging queue performance issues- you typically want to know if a particular
     # job class is taking a long time, or if a priority class is stuck.
     def trace_work_job(job, &block)
-      labels = {
+      labels = @base_labels.merge(
         job_class: job["job_class"], priority: job["priority"], queue: job["queue"],
-      }
+      )
       @metrics[:que_jobs_latency_seconds_total].increment(labels, job[:latency])
 
       # Note that we've begun processing our job, so we can continually update the counter
