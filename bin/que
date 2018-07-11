@@ -5,8 +5,6 @@ require 'optparse'
 require 'ostruct'
 require 'logger'
 
-class QueJobTimeoutError < StandardError; end
-
 $stdout.sync = true
 
 options = OpenStruct.new
@@ -24,6 +22,10 @@ OptionParser.new do |opts|
 
   opts.on('-e', '--cursor-expiry [EXPIRY]', Integer, "Enable performance patch with cached cursors") do |cursor_expiry|
     options.cursor_expiry = cursor_expiry
+  end
+
+  opts.on('-c', '--worker-count [COUNT]', Integer, "Start this many threaded workers") do |worker_count|
+    options.worker_count = worker_count
   end
 
   opts.on('-m', '--metrics-labels [LABELS]', String, "Base labels for each prometheus metric, in key=value,... form") do |metrics_labels|
@@ -45,12 +47,8 @@ OptionParser.new do |opts|
     options.priority_threshold = priority_threshold
   end
 
-  opts.on('--timeout [TIMEOUT]', Integer, "Set the amount of time (in seconds) to wait, after receiving SIGTERM/SIGINT, for a worker to finish before forcing it to stop") do |timeout|
+  opts.on('--timeout [TIMEOUT]', Integer, "Set the amount of time (in seconds) to wait, after receiving SIGTERM/SIGINT, for workers to finish before forcing them to stop") do |timeout|
     options.timeout = timeout
-  end
-
-  opts.on('--timeout-message [MESSAGE]', String, "Set the exception message that will be sent in the event of a worker timeout") do |timeout_message|
-    options.timeout_message = timeout_message
   end
 
   opts.on('-v', '--version', "Show Que version") do
@@ -94,48 +92,36 @@ rescue NameError
   exit 1
 end
 
-queue_name          = options.queue_name         || ENV['QUE_QUEUE'] || Que::Worker::DEFAULT_QUEUE
-wake_interval       = options.wake_interval      || ENV['QUE_WAKE_INTERVAL']&.to_f
-metrics_labels      = options.metrics_labels     || {}
-cursor_expiry       = options.cursor_expiry      || 0
+def wait_for_signals(*signals, sleep_interval: 1)
+  received_signal = false
+  signals.each { |signal| trap(signal) { received_signal = true } }
+
+  sleep(sleep_interval) until received_signal
+end
+
+queue_name          = options.queue_name     || ENV['QUE_QUEUE'] || Que::Worker::DEFAULT_QUEUE
+wake_interval       = options.wake_interval  || ENV['QUE_WAKE_INTERVAL']&.to_f
+metrics_labels      = options.metrics_labels || {}
+cursor_expiry       = options.cursor_expiry  || 0
+worker_count        = options.worker_count   || 1
 priority_threshold  = options.priority_threshold || ENV['QUE_PRIORITY_THRESHOLD'].to_i
 timeout             = options.timeout
-timeout_message     = options.timeout_message    || ""
 
-Que.logger.info(msg: 'Starting worker', event: 'que.worker.start')
-
-worker = Que::Worker.new(
+stop_workers = Que::Worker.start_workers(
+  worker_count,
   queue: queue_name,
   wake_interval: wake_interval,
   metrics_labels: metrics_labels,
   priority_threshold: priority_threshold,
-  lock_cursor_expiry: cursor_expiry
+  lock_cursor_expiry: cursor_expiry,
+  metrics_registry: Prometheus::Client.registry
 )
 
-Thread.new { worker.metrics.expose(port: options.metrics_port) } if options.metrics_port
-
-stop = false
-%w[INT TERM].each { |signal| trap(signal) { stop = true } }
-
-worker_thread = Thread.new { worker.work_loop }
-
-sleep 0.1 until stop
-
-Que.logger.info(msg: 'Waiting for worker to finish', event: 'que.worker.finish_wait')
-
-worker.stop!
-
-if timeout
-  timeout.seconds.downto(0) do
-    break unless worker_thread.alive?
-    sleep 1
-  end
-
-  if worker_thread.alive?
-    Que.logger.info(msg: 'Worker still running - forcing it to stop', event: 'que.worker.finish_force')
-    worker_thread.raise(QueJobTimeoutError, timeout_message)
-    worker_thread.join
+if options.metrics_port
+  Thread.new do
+    Que::Metrics.expose(Prometheus::Client.registry, port: options.metrics_port)
   end
 end
 
-Que.logger.info(msg: 'Worker finished, exiting', event: 'que.worker.finish')
+wait_for_signals("INT", "TERM")
+stop_workers.call(timeout)

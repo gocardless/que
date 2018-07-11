@@ -1,19 +1,11 @@
 # frozen_string_literal: true
 
 require "spec_helper"
+require "que/worker" # required to prevent autoload races
 
 RSpec.describe "multiple workers" do
-  def with_workers(n)
-    workers = Array.new(n) { Que::Worker.new(wake_interval: 0.1) }
-    worker_threads = workers.map { |worker| Thread.new { worker.work_loop } }
-    worker_threads.each { |t| t.abort_on_exception = true }
-
-    yield
-
-    workers.each(&:stop!)
-    worker_threads.each do |thread|
-      raise "timed out waiting for worker to finish!" unless thread.join(5)
-    end
+  def with_workers(n, stop_timeout: 5)
+    Que::Worker.start_workers(n, wake_interval: 0.01).tap { yield }.call(stop_timeout)
   end
 
   # Wait for a maximum of [timeout] seconds for all jobs to be worked
@@ -71,6 +63,22 @@ RSpec.describe "multiple workers" do
       expect(QueJob.count).to eq(0)
       expect(User.count).to eq(3)
       expect(User.all.map(&:name).sort).to eq(["alice", "bob", "charlie"])
+    end
+  end
+
+  context "with jobs that exceed stop timeout" do
+    it "raises Que::JobTimeoutError" do
+      SleepJob.enqueue(5) # sleep 5s
+
+      # Sleep to let the worker pick-up the SleepJob, then stop the worker with an
+      # aggressive timeout. This should cause JobTimeout to be raised in the worker
+      # thread.
+      with_workers(1, stop_timeout: 0.01) { sleep 0.1 }
+
+      sleep_job = QueJob.last
+
+      expect(sleep_job).not_to be(nil)
+      expect(sleep_job.last_error).to match(/Job exceeded timeout when requested to stop/)
     end
   end
 end

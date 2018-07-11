@@ -7,7 +7,8 @@ Que.connection = ActiveRecord
 
 Que.logger = Logger.new(STDOUT)
 Que.logger.formatter = proc do |severity, datetime, progname, payload|
-  { ts: datetime, level: severity }.merge(payload).to_json + "\n"
+  { ts: datetime, tid: Thread.current.object_id, level: severity }.
+    merge(payload).to_json + "\n"
 end
 
 class QueJob < ActiveRecord::Base

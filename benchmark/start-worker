@@ -3,6 +3,7 @@
 bundle exec que \
   --metrics-labels "host=${HOSTNAME},env=benchmark" \
   --metrics-port 8080 \
+  --worker-count "${WORKER_COUNT}" \
   --wake-interval "${WAKE_INTERVAL}" \
   --cursor-expiry "${CURSOR_EXPIRY}" \
   --log-level INFO \
