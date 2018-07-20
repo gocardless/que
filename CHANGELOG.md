@@ -1,3 +1,11 @@
+### 1.0.0 (2018-07-20)
+
+*   Refactor of Que internals
+*   Prometheus metrics
+*   Changes to logging key/values
+*   Introduction of Kubernetes benchmark code
+*   Performance patch to Que locking
+
 ### 0.11.8 (2017-07-12)
 
 *   Serialise and deserialise job args when running in sync mode. (georgea93)
