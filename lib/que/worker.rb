@@ -5,7 +5,7 @@ require "que/metrics"
 require "que/locker"
 
 module Que
-  class JobTimeoutError < StandardError; end
+  class JobTimeoutError < Exception; end
 
   class Worker
     # Defines the time a worker will wait before checking Postgres for its next job
@@ -139,7 +139,7 @@ module Que
                 duration: duration,
               )
             )
-          rescue => error
+          rescue StandardError, JobTimeoutError => error
             Que.logger&.error(
               log_keys.merge(
                 event: "que_job.job_error",
