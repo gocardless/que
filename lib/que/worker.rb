@@ -3,10 +3,9 @@
 require "benchmark"
 require "que/metrics"
 require "que/locker"
+require "que/job_timeout_error"
 
 module Que
-  class JobTimeoutError < StandardError; end
-
   class Worker
     # Defines the time a worker will wait before checking Postgres for its next job
     DEFAULT_QUEUE = ''
