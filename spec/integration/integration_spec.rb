@@ -81,4 +81,17 @@ RSpec.describe "multiple workers" do
       expect(sleep_job.last_error).to match(/Job exceeded timeout when requested to stop/)
     end
   end
+
+  context "and that job has a rescue-all clause" do
+    it "raises Que::JobTimeoutError" do
+      RescueSleepJob.enqueue(0.1)
+
+      with_workers(1, stop_timeout: 0.1) { sleep 0.1 }
+
+      rescue_sleep_job = QueJob.last
+
+      expect(rescue_sleep_job).not_to be(nil)
+      expect(rescue_sleep_job.last_error).to match(/Job exceeded timeout when requested to stop/)
+    end
+  end
 end
