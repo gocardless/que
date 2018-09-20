@@ -13,6 +13,8 @@ unless ARGV.count == 3
     seed-jobs 5_000 0 1
 
   USAGE
+
+  exit -1
 end
 
 def parse_range(token)
