@@ -12,6 +12,7 @@ require_relative "que/version"
 require_relative "que/worker"
 require_relative "que/worker_group"
 require_relative "que/middleware/worker_collector"
+require_relative "que/middleware/queue_collector"
 
 module Que
   begin
