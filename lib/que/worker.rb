@@ -14,24 +14,26 @@ module Que
     DEFAULT_WAKE_INTERVAL = 5
     DEFAULT_LOCK_CURSOR_EXPIRY = 0 # seconds
 
-    RunningSecondsTotal = Prometheus::Client.registry.counter(
-      :que_worker_running_seconds_total, "Time since starting to work jobs",
-    )
-    SleepingSecondsTotal = Prometheus::Client.registry.counter(
-      :que_worker_sleeping_seconds_total, "Time spent sleeping due to no jobs",
-    )
-    JobsWorkedTotal = Prometheus::Client.registry.counter(
-      :que_job_worked_total, "Counter for all jobs processed",
-    )
-    JobsErrorTotal = Prometheus::Client.registry.counter(
-      :que_job_error_total, "Counter for all jobs that were run but errored",
-    )
-    JobsWorkedSecondsTotal = Prometheus::Client.registry.counter(
-      :que_job_worked_seconds_total, "Sum of the time spent processing each job class",
-    )
-    JobsLatencySecondsTotal = Prometheus::Client.registry.counter(
-      :que_job_latency_seconds_total, "Sum of time spent by job and priority waiting in queue",
-    )
+    METRICS = [
+      RunningSecondsTotal = Prometheus::Client::Counter.new(
+        :que_worker_running_seconds_total, "Time since starting to work jobs",
+      ),
+      SleepingSecondsTotal = Prometheus::Client::Counter.new(
+        :que_worker_sleeping_seconds_total, "Time spent sleeping due to no jobs",
+      ),
+      JobsWorkedTotal = Prometheus::Client::Counter.new(
+        :que_job_worked_total, "Counter for all jobs processed",
+      ),
+      JobsErrorTotal = Prometheus::Client::Counter.new(
+        :que_job_error_total, "Counter for all jobs that were run but errored",
+      ),
+      JobsWorkedSecondsTotal = Prometheus::Client::Counter.new(
+        :que_job_worked_seconds_total, "Sum of the time spent processing each job class",
+      ),
+      JobsLatencySecondsTotal = Prometheus::Client::Counter.new(
+        :que_job_latency_seconds_total, "Sum of time spent by job and priority waiting in queue",
+      ),
+    ]
 
     # Metrics from the worker are often collected over long spans of time. We don't want
     # to update the metric only once the long-running task has complete, as this leads to

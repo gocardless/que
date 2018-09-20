@@ -1,9 +1,11 @@
 # frozen_string_literal: true
 
+require "prometheus/client"
+
 module Que
   module Middleware
     class QueueCollector
-      Queued = Prometheus::Client.registry.gauge(
+      Queued = Prometheus::Client::Gauge.new(
         :que_queue_queued, "Number of jobs in the queue, by job_class/priority/due",
       )
 
@@ -21,6 +23,8 @@ module Que
 
       def initialize(app, options = {})
         @app = app
+        @registry = options.fetch(:registry, Prometheus::Client.registry)
+        @registry.register(Queued) rescue Prometheus::Client::Registry::AlreadyRegisteredError
       end
 
       def call(env)

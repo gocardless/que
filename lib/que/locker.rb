@@ -14,24 +14,26 @@ module Que
   # For more information, see the 'Predicate Specificity' chapter of:
   # https://brandur.org/postgres-queues
   class Locker
-    ExistsTotal = Prometheus::Client.registry.counter(
-      :que_locker_exists_total, "Counter of attempts to check job existence before locking",
-    )
-    ExistsSecondsTotal = Prometheus::Client.registry.counter(
-      :que_locker_exists_seconds_total, "Seconds spent checking job exists before locking",
-    )
-    UnlockTotal = Prometheus::Client.registry.counter(
-      :que_locker_unlock_total, "Counter of attempts to unlock advisory job locks",
-    )
-    UnlockSecondsTotal = Prometheus::Client.registry.counter(
-      :que_locker_unlock_seconds_total, "Seconds spent unlocking advisory job locks",
-    )
-    AcquireTotal = Prometheus::Client.registry.counter(
-      :que_locker_acquire_total, "Total number of job lock queries executed",
-    )
-    AcquireSecondsTotal = Prometheus::Client.registry.counter(
-      :que_locker_acquire_seconds_total, "Seconds spent running job lock query",
-    )
+    METRICS = [
+      ExistsTotal = Prometheus::Client::Counter.new(
+        :que_locker_exists_total, "Counter of attempts to check job existence before locking",
+      ),
+      ExistsSecondsTotal = Prometheus::Client::Counter.new(
+        :que_locker_exists_seconds_total, "Seconds spent checking job exists before locking",
+      ),
+      UnlockTotal = Prometheus::Client::Counter.new(
+        :que_locker_unlock_total, "Counter of attempts to unlock advisory job locks",
+      ),
+      UnlockSecondsTotal = Prometheus::Client::Counter.new(
+        :que_locker_unlock_seconds_total, "Seconds spent unlocking advisory job locks",
+      ),
+      AcquireTotal = Prometheus::Client::Counter.new(
+        :que_locker_acquire_total, "Total number of job lock queries executed",
+      ),
+      AcquireSecondsTotal = Prometheus::Client::Counter.new(
+        :que_locker_acquire_seconds_total, "Seconds spent running job lock query",
+      ),
+    ]
 
     def initialize(queue:, cursor_expiry:)
       @queue = queue
