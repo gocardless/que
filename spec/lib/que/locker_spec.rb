@@ -7,7 +7,6 @@ RSpec.describe Que::Locker do
     described_class.new(
       queue: queue,
       cursor_expiry: cursor_expiry,
-      metrics: Que::Metrics.new,
     )
   end
 

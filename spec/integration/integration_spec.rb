@@ -5,7 +5,7 @@ require "que/worker" # required to prevent autoload races
 
 RSpec.describe "multiple workers" do
   def with_workers(n, stop_timeout: 5)
-    Que::Worker.start_workers(n, wake_interval: 0.01).tap { yield }.call(stop_timeout)
+    Que::WorkerGroup.start(n, wake_interval: 0.01).tap { yield }.stop(stop_timeout)
   end
 
   # Wait for a maximum of [timeout] seconds for all jobs to be worked

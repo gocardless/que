@@ -1,106 +1,132 @@
 # frozen_string_literal: true
 
+require "pg"
 require "benchmark"
-require "que/metrics"
-require "que/locker"
-require "que/job_timeout_error"
+require "prometheus/client"
+
+require_relative "locker"
+require_relative "job_timeout_error"
 
 module Que
   class Worker
     # Defines the time a worker will wait before checking Postgres for its next job
-    DEFAULT_QUEUE = ''
+    DEFAULT_QUEUE = ""
     DEFAULT_WAKE_INTERVAL = 5
     DEFAULT_LOCK_CURSOR_EXPIRY = 0 # seconds
-    DEFAULT_STOP_TIMEOUT = 5 # seconds
 
-    # Start worker_count number of threaded workers, returning a proc that can be called
-    # to stop the workers from working.
-    def self.start_workers(worker_count, metrics_labels: {}, **kwargs)
-      Que.logger.info(msg: 'Starting workers', event: 'que.worker.start', worker_count: worker_count)
+    RunningSecondsTotal = Prometheus::Client.registry.counter(
+      :que_worker_running_seconds_total, "Time since starting to work jobs",
+    )
+    SleepingSecondsTotal = Prometheus::Client.registry.counter(
+      :que_worker_sleeping_seconds_total, "Time spent sleeping due to no jobs",
+    )
+    JobsWorkedTotal = Prometheus::Client.registry.counter(
+      :que_job_worked_total, "Counter for all jobs processed",
+    )
+    JobsErrorTotal = Prometheus::Client.registry.counter(
+      :que_job_error_total, "Counter for all jobs that were run but errored",
+    )
+    JobsWorkedSecondsTotal = Prometheus::Client.registry.counter(
+      :que_job_worked_seconds_total, "Sum of the time spent processing each job class",
+    )
+    JobsLatencySecondsTotal = Prometheus::Client.registry.counter(
+      :que_job_latency_seconds_total, "Sum of time spent by job and priority waiting in queue",
+    )
 
-      # Create each worker with a distinct ID in order to differentiate each workers
-      # prometheus metrics.
-      workers = Array.new(worker_count) do |id|
-        Worker.new(**kwargs.merge(metrics_labels: metrics_labels.merge(worker: id)))
+    # Metrics from the worker are often collected over long spans of time. We don't want
+    # to update the metric only once the long-running task has complete, as this leads to
+    # graphs that dump all the weight of your task just as it finishes. The Collector
+    # class is used to provide an interface to update each metric as we receive requests
+    # to read the metric, solving this problem.
+    class Collector
+      Trace = Struct.new(:metric, :labels, :time)
+
+      def initialize(worker)
+        @worker = worker
+        @lock = Mutex.new
+        @traces = []
       end
 
-      worker_threads = workers.map { |worker| Thread.new { worker.work_loop } }
+      def collect(traces = @traces)
+        return if @worker.stopped?
 
-      -> (stop_timeout = DEFAULT_STOP_TIMEOUT) do
-        Que.logger.info(msg: "Asking workers to finish", event: "que.worker.finish_wait")
+        @lock.synchronize do
+          now = monotonic_now
+          traces.each do |trace|
+            time_since = [now- trace.time, 0].max
+            trace.time = now
+            trace.metric.increment(
+              trace.labels.merge(worker: @worker.object_id),
+              time_since,
+            )
+          end
+        end
+      end
 
-        workers.each(&:stop!)
+      def trace(metric, labels = {}, &block)
+        start(metric)
+        block.call
+      ensure
+        stop(metric)
+      end
 
-        # Asynchronously stop all workers, sending a join method call with a timeout. This
-        # is done asynchronously to ensure we start the timeout at the same time for each
-        # worker, instead of applying them cumulatively.
-        worker_threads.each_with_index do |thread, idx|
-          Thread.new do
-            unless thread.join(stop_timeout)
-              Que.logger.info(
-                msg: "Worker still running - forcing it to stop",
-                worker: idx, event: "que.worker.finish_timeout",
-              )
+      private
 
-              # Caveat that this API (Thread.raise) can be dangerous in Ruby. It can leave
-              # resources in strange states as the exception is trapped immediately in the
-              # target thread, potentially during code that expected no interruptions.
-              #
-              # We can expect this exception to be raised just before our process receives
-              # a SIGKILL, so any hanging resources are probably about to be claimed by
-              # the OS after process death. Given our impending doom, the benefit of
-              # having Que track timeouts against the affected job seems worth the risk of
-              # short-lived undefined behaviour.
-              #
-              # If we begin to see issues with this approach (strange TCP connection
-              # states, connection pool issues, etc) then we should re-evaluate.
-              thread.raise(JobTimeoutError, "Job exceeded timeout when requested to stop")
-            end
+      def start(metric, labels = {})
+        @lock.synchronize { @traces << Trace.new(metric, labels, monotonic_now) }
+      end
+
+      def stop(metric, labels = {})
+        matching = nil
+        @lock.synchronize do
+          matching, @traces = @traces.partition do |trace|
+            trace.metric == metric && trace.labels == labels
           end
         end
 
-        # We now know the thread is either finished or has raised an exception. The final
-        # join gives the worker thread time to finish its work loop and record the timeout
-        # exception against the job it was working.
-        worker_threads.each(&:join)
+        collect(matching)
+      end
 
-        Que.logger.info(msg: "All workers have finished", event: "que.worker.finish")
+      # We're doing duration arithmetic which should make use of monotonic clocks, to avoid
+      # changes to the system time from affecting our metrics.
+      def monotonic_now
+        Process.clock_gettime(Process::CLOCK_MONOTONIC)
       end
     end
 
     def initialize(
       queue: DEFAULT_QUEUE,
       wake_interval: DEFAULT_WAKE_INTERVAL,
-      lock_cursor_expiry: DEFAULT_LOCK_CURSOR_EXPIRY,
-      metrics_labels: {},
-      metrics_registry: Prometheus::Client.registry
+      lock_cursor_expiry: DEFAULT_LOCK_CURSOR_EXPIRY
     )
       @queue = queue
       @wake_interval = wake_interval
-      @metrics = Metrics.new(labels: metrics_labels, registry: metrics_registry)
-      @locker = Locker.new(queue: queue, cursor_expiry: lock_cursor_expiry, metrics: metrics)
-      @stop = false
+      @locker = Locker.new(queue: queue, cursor_expiry: lock_cursor_expiry)
+      @collector = Collector.new(self)
+      @stop = false # instruct worker to stop
+      @stopped =  false # mark worker as having stopped
     end
 
     attr_reader :metrics
 
     def work_loop
       return if @stop
-      stop_trace = @metrics.trace_start_work(queue: @queue)
 
-      loop do
-        case event = work
-        when :job_not_found, :postgres_error
-          Que.logger&.info(event: "que.#{event}", wake_interval: @wake_interval)
-          @metrics.trace_sleeping(queue: @queue) { sleep(@wake_interval) }
-        when :job_worked
-          nil # immediately find a new job to work
+      @collector.trace(RunningSecondsTotal) do
+        loop do
+          case event = work
+          when :job_not_found, :postgres_error
+            Que.logger&.info(event: "que.#{event}", wake_interval: @wake_interval)
+            @collector.trace(SleepingSecondsTotal) { sleep(@wake_interval) }
+          when :job_worked
+            nil # immediately find a new job to work
+          end
+
+          break if @stop
         end
-
-        break if @stop
       end
     ensure
-      stop_trace.call if stop_trace
+      @stopped = true
     end
 
     def work
@@ -117,6 +143,10 @@ module Que
             que_job_id: job["job_id"],
           }
 
+          labels = {
+            job_class: job["job_class"], priority: job["priority"], queue: job["queue"],
+          }
+
           begin
             Que.logger&.info(
               log_keys.merge(
@@ -126,9 +156,14 @@ module Que
             )
 
             klass = class_for(job[:job_class])
-            # TODO: _run -> run_and_destroy(*job[:args])
+
+            # Note the time spent waiting in the queue before being processed
+            JobsLatencySecondsTotal.increment(labels, job[:latency])
+
             duration = Benchmark.measure do
-              @metrics.trace_work_job(job) { klass.new(job)._run }
+              # TODO: _run -> run_and_destroy(*job[:args])
+              @collector.trace(JobsWorkedSecondsTotal, labels) { klass.new(job)._run }
+              JobsWorkedTotal.increment(labels, 1)
             end.real
 
             Que.logger&.info(
@@ -168,6 +203,14 @@ module Que
       @stop = true
     end
 
+    def stopped?
+      @stopped
+    end
+
+    def collect_metrics
+      @collector.collect
+    end
+
     private
 
     # Set the error and retry with back-off
@@ -186,6 +229,12 @@ module Que
 
     def class_for(string)
       Que.constantize(string)
+    end
+
+    # We're doing duration arithmetic which should make use of monotonic clocks, to avoid
+    # changes to the system time from affecting our metrics.
+    def monotonic_now
+      Process.clock_gettime(Process::CLOCK_MONOTONIC)
     end
   end
 end

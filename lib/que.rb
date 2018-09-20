@@ -1,18 +1,19 @@
 # frozen_string_literal: true
 
-require 'socket' # For hostname
+require "socket" # For hostname
+
+require_relative "que/adapters/base"
+require_relative "que/job"
+require_relative "que/job_timeout_error"
+require_relative "que/locker"
+require_relative "que/migrations"
+require_relative "que/sql"
+require_relative "que/version"
+require_relative "que/worker"
+require_relative "que/worker_group"
+require_relative "que/middleware/worker_collector"
 
 module Que
-  autoload :Adapters,        'que/adapters/base'
-  autoload :Job,             'que/job'
-  autoload :Migrations,      'que/migrations'
-  autoload :SQL,             'que/sql'
-  autoload :Version,         'que/version'
-  autoload :Worker,          'que/worker'
-  autoload :Metrics,         'que/metrics'
-  autoload :Locker,          'que/locker'
-  autoload :JobTimeoutError, 'que/job_timeout_error'
-
   begin
     require 'multi_json'
     JSON_MODULE = MultiJson
