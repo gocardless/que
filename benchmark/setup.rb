@@ -1,3 +1,5 @@
+#!/usr/bin/env ruby
+
 require "que"
 require "json"
 require "active_record"
