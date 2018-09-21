@@ -1,9 +1,11 @@
 #!/usr/bin/env ruby
 
-require 'que'
+require 'logger'
 require 'optparse'
 require 'ostruct'
-require 'logger'
+require 'que'
+require 'rack'
+require 'prometheus/middleware/exporter'
 
 $stdout.sync = true
 
@@ -26,13 +28,6 @@ OptionParser.new do |opts|
 
   opts.on('-c', '--worker-count [COUNT]', Integer, "Start this many threaded workers") do |worker_count|
     options.worker_count = worker_count
-  end
-
-  opts.on('-m', '--metrics-labels [LABELS]', String, "Base labels for each prometheus metric, in key=value,... form") do |metrics_labels|
-    options.metrics_labels = metrics_labels.split(",").each_with_object({}) do |kv, labels|
-      key, value = kv.split("=")
-      labels[key.to_sym] = value
-    end
   end
 
   opts.on('-l', '--log-level [LEVEL]', String, "Set level of Que's logger (debug, info, warn, error, fatal) (default: info)") do |log_level|
@@ -97,25 +92,41 @@ end
 
 queue_name     = options.queue_name     || ENV['QUE_QUEUE'] || Que::Worker::DEFAULT_QUEUE
 wake_interval  = options.wake_interval  || ENV['QUE_WAKE_INTERVAL']&.to_f
-metrics_labels = options.metrics_labels || {}
 cursor_expiry  = options.cursor_expiry  || 0
 worker_count   = options.worker_count   || 1
 timeout        = options.timeout
 
-stop_workers = Que::Worker.start_workers(
+worker_group = Que::WorkerGroup.start(
   worker_count,
   queue: queue_name,
   wake_interval: wake_interval,
   lock_cursor_expiry: cursor_expiry,
-  metrics_labels: metrics_labels,
-  metrics_registry: Prometheus::Client.registry
 )
 
 if options.metrics_port
   Thread.new do
-    Que::Metrics.expose(Prometheus::Client.registry, port: options.metrics_port)
+    Que.logger&.info(
+      event: "serving_metrics",
+      msg: "Serving /metrics endpoint",
+      port: options.metrics_port,
+    )
+
+    app = Rack::Builder.new do
+      use Que::Middleware::WorkerCollector, worker_group: worker_group
+      use Prometheus::Middleware::Exporter
+
+      run lambda { |env| [200, {}, ["healthy"]] }
+    end
+
+    Rack::Handler::WEBrick.run(
+      app,
+      Host: "0.0.0.0",
+      Port: options.metrics_port,
+      Logger: WEBrick::Log.new("/dev/null"),
+      AccessLog: [],
+    )
   end
 end
 
 wait_for_signals("INT", "TERM")
-stop_workers.call(timeout)
+worker_group.stop(timeout)

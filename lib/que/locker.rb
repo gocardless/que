@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "prometheus/client"
+
 module Que
   # The Locker is used to acquire a job from the Postgres jobs table. The only method we
   # expose is with_locked_job, as we want to ensure that callers safely unlock their jobs.
@@ -12,9 +14,29 @@ module Que
   # For more information, see the 'Predicate Specificity' chapter of:
   # https://brandur.org/postgres-queues
   class Locker
-    def initialize(queue:, cursor_expiry:, metrics:)
+    METRICS = [
+      ExistsTotal = Prometheus::Client::Counter.new(
+        :que_locker_exists_total, "Counter of attempts to check job existence before locking",
+      ),
+      ExistsSecondsTotal = Prometheus::Client::Counter.new(
+        :que_locker_exists_seconds_total, "Seconds spent checking job exists before locking",
+      ),
+      UnlockTotal = Prometheus::Client::Counter.new(
+        :que_locker_unlock_total, "Counter of attempts to unlock job advisory locks",
+      ),
+      UnlockSecondsTotal = Prometheus::Client::Counter.new(
+        :que_locker_unlock_seconds_total, "Seconds spent unlocking job advisory locks",
+      ),
+      AcquireTotal = Prometheus::Client::Counter.new(
+        :que_locker_acquire_total, "Counter of number of job lock queries executed",
+      ),
+      AcquireSecondsTotal = Prometheus::Client::Counter.new(
+        :que_locker_acquire_seconds_total, "Seconds spent running job lock query",
+      ),
+    ]
+
+    def initialize(queue:, cursor_expiry:)
       @queue = queue
-      @metrics = metrics
       @cursor_expiry = cursor_expiry
       @cursor = 0
       @cursor_expires_at = monotonic_now
@@ -61,7 +83,7 @@ module Que
       yield job
     ensure
       if job
-        @metrics.trace_unlock_job(queue: @queue) do
+        observe(UnlockTotal, UnlockSecondsTotal) do
           Que.execute("SELECT pg_advisory_unlock($1)", [job[:job_id]])
         end
       end
@@ -70,13 +92,13 @@ module Que
     private
 
     def lock_job
-      @metrics.trace_acquire_job(queue: @queue) do
+      observe(AcquireTotal, AcquireSecondsTotal) do
         Que.execute(:lock_job, [@queue, @cursor]).first
       end
     end
 
     def exists?(job)
-      @metrics.trace_job_exists(queue: @queue) do
+      observe(ExistsTotal, ExistsSecondsTotal) do
         Que.execute(:check_job, job.values_at(*Job::JOB_INSTANCE_FIELDS)).any? if job
       end
     end
@@ -88,6 +110,14 @@ module Que
     def reset_cursor
       @cursor = 0
       @cursor_expires_at = monotonic_now + @cursor_expiry
+    end
+
+    def observe(metric, metric_duration, &block)
+      now = monotonic_now
+      block.call
+    ensure
+      metric.increment({queue: @queue}, 1)
+      metric_duration.increment({queue: @queue}, monotonic_now - now)
     end
 
     def monotonic_now

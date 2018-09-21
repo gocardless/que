@@ -1,9 +1,12 @@
+#!/usr/bin/env ruby
+
 require "que"
 require "json"
 require "active_record"
 
 ActiveRecord::Base.establish_connection(adapter: "postgresql", dbname: "que-benchmark")
 Que.connection = ActiveRecord
+Que.migrate!
 
 Que.logger = Logger.new(STDOUT)
 Que.logger.formatter = proc do |severity, datetime, progname, payload|

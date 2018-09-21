@@ -1,0 +1,19 @@
+#!/usr/bin/env ruby
+
+require "rack"
+require "prometheus/middleware/exporter"
+
+require_relative "setup"
+
+Rack::Handler::WEBrick.run(
+  Rack::Builder.new do
+    use Que::Middleware::QueueCollector
+    use Prometheus::Middleware::Exporter
+
+    run lambda { |env| [200, {}, ["healthy"]] }
+  end,
+  Host: "0.0.0.0",
+  Port: 4567,
+  Logger: WEBrick::Log.new("/dev/stdout"),
+  AccessLog: [],
+)
