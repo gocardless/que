@@ -4,21 +4,20 @@ require "prometheus/client"
 
 module Que
   module Middleware
+    # Updates prometheus queue level metrics. This should be placed just before any rack
+    # middleware that serves prometheus metrics in order to generate fresh values just
+    # before responding a scrape.
     class QueueCollector
       Queued = Prometheus::Client::Gauge.new(
         :que_queue_queued, "Number of jobs in the queue, by job_class/priority/due",
       )
 
       QUEUE_VIEW_SQL = <<~SQL.freeze
-        with que_jobs_with_due as (
-          select queue, job_class, priority,
-               ( case when (retryable AND run_at < now()) then 'true' else 'false' end ) as due
-            from que_jobs
-        )
-        select queue, job_class, priority, due, count(*)
-          from que_jobs_with_due
-         group by queue, job_class, priority, due;
-
+        select queue, job_class, priority
+             , (case when (retryable AND run_at < now()) then 'true' else 'false' end) as due
+             , count(*)
+          from que_jobs
+         group by 1, 2, 3, 4;
       SQL
 
       def initialize(app, options = {})

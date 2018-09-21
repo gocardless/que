@@ -4,10 +4,15 @@ require "prometheus/client"
 
 module Que
   module Middleware
+    # When called, will ask each worker to update the prometheus metrics that it exports,
+    # ensuring that immediately after calling metrics like worker run seconds are
+    # up-to-date.
+    #
+    # This should be placed just before any middleware that serves prometheus metrics.
     class WorkerCollector
       def initialize(app, options = {})
         @app = app
-        @workers = options.fetch(:workers) # WorkerGroup
+        @worker_group = options.fetch(:worker_group)
         @registry = options.fetch(:registry, Prometheus::Client.registry)
 
         register(*Worker::METRICS)
@@ -15,7 +20,7 @@ module Que
       end
 
       def call(env)
-        @workers.each(&:collect_metrics)
+        @worker_group.workers.each(&:collect_metrics)
         @app.call(env)
       end
 

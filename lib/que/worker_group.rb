@@ -22,10 +22,6 @@ module Que
 
     attr_reader :workers
 
-    def each(&block)
-      workers.each(&block)
-    end
-
     def stop(timeout = DEFAULT_STOP_TIMEOUT)
       Que.logger.info(msg: "Asking workers to finish", event: "que.worker.finish_wait")
 

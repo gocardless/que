@@ -31,16 +31,19 @@ module Que
         :que_job_worked_seconds_total, "Sum of the time spent processing each job class",
       ),
       JobsLatencySecondsTotal = Prometheus::Client::Counter.new(
-        :que_job_latency_seconds_total, "Sum of time spent by job and priority waiting in queue",
+        :que_job_latency_seconds_total, "Sum of time spent waiting in queue",
       ),
     ]
 
-    # Metrics from the worker are often collected over long spans of time. We don't want
-    # to update the metric only once the long-running task has complete, as this leads to
-    # graphs that dump all the weight of your task just as it finishes. The Collector
-    # class is used to provide an interface to update each metric as we receive requests
-    # to read the metric, solving this problem.
-    class Collector
+    # We have metrics of the form "worker running seconds total", where we need to be
+    # updating the metrics over the course of a very long-running task. This class is used
+    # to track on-going 'traces', which are records of tasks starting and stopping, and is
+    # used to periodically update the associated trace metrics.
+    #
+    # Each worker exposes a X method that can be used to trigger an update of these
+    # metrics. This in turn is used by the Middleware::WorkerCollector to ensure our
+    # worker metrics are correct before serving prometheus metrics.
+    class LongRunningMetricTracer
       Trace = Struct.new(:metric, :labels, :time)
 
       def initialize(worker)
@@ -49,13 +52,18 @@ module Que
         @traces = []
       end
 
+      # Update currently traced metrics- this will increment all on-going traces with the
+      # delta of time between the last update and now.
       def collect(traces = @traces)
+        # If our worker has violently died, and didn't clean-up its traces, we don't want
+        # to continue incrementing our metrics as this would imply we are still running
+        # and alive.
         return if @worker.stopped?
 
         @lock.synchronize do
           now = monotonic_now
           traces.each do |trace|
-            time_since = [now- trace.time, 0].max
+            time_since = [now - trace.time, 0].max
             trace.time = now
             trace.metric.increment(
               trace.labels.merge(worker: @worker.object_id),
@@ -66,10 +74,10 @@ module Que
       end
 
       def trace(metric, labels = {}, &block)
-        start(metric)
+        start(metric, labels)
         block.call
       ensure
-        stop(metric)
+        stop(metric, labels)
       end
 
       private
@@ -104,7 +112,7 @@ module Que
       @queue = queue
       @wake_interval = wake_interval
       @locker = Locker.new(queue: queue, cursor_expiry: lock_cursor_expiry)
-      @collector = Collector.new(self)
+      @tracer = LongRunningMetricTracer.new(self)
       @stop = false # instruct worker to stop
       @stopped =  false # mark worker as having stopped
     end
@@ -114,12 +122,12 @@ module Que
     def work_loop
       return if @stop
 
-      @collector.trace(RunningSecondsTotal) do
+      @tracer.trace(RunningSecondsTotal, queue: @queue) do
         loop do
           case event = work
           when :job_not_found, :postgres_error
             Que.logger&.info(event: "que.#{event}", wake_interval: @wake_interval)
-            @collector.trace(SleepingSecondsTotal) { sleep(@wake_interval) }
+            @tracer.trace(SleepingSecondsTotal, queue: @queue) { sleep(@wake_interval) }
           when :job_worked
             nil # immediately find a new job to work
           end
@@ -159,13 +167,15 @@ module Que
 
             klass = class_for(job[:job_class])
 
-            # Note the time spent waiting in the queue before being processed
+            # Note the time spent waiting in the queue before being processed, and update
+            # the jobs worked count here so that latency_seconds_total / worked_total
+            # doesn't suffer from skew.
             JobsLatencySecondsTotal.increment(labels, job[:latency])
+            JobsWorkedTotal.increment(labels, 1)
 
             duration = Benchmark.measure do
               # TODO: _run -> run_and_destroy(*job[:args])
-              @collector.trace(JobsWorkedSecondsTotal, labels) { klass.new(job)._run }
-              JobsWorkedTotal.increment(labels, 1)
+              @tracer.trace(JobsWorkedSecondsTotal, labels) { klass.new(job)._run }
             end.real
 
             Que.logger&.info(
@@ -210,7 +220,7 @@ module Que
     end
 
     def collect_metrics
-      @collector.collect
+      @tracer.collect
     end
 
     private
@@ -231,12 +241,6 @@ module Que
 
     def class_for(string)
       Que.constantize(string)
-    end
-
-    # We're doing duration arithmetic which should make use of monotonic clocks, to avoid
-    # changes to the system time from affecting our metrics.
-    def monotonic_now
-      Process.clock_gettime(Process::CLOCK_MONOTONIC)
     end
   end
 end

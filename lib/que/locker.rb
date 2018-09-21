@@ -22,13 +22,13 @@ module Que
         :que_locker_exists_seconds_total, "Seconds spent checking job exists before locking",
       ),
       UnlockTotal = Prometheus::Client::Counter.new(
-        :que_locker_unlock_total, "Counter of attempts to unlock advisory job locks",
+        :que_locker_unlock_total, "Counter of attempts to unlock job advisory locks",
       ),
       UnlockSecondsTotal = Prometheus::Client::Counter.new(
-        :que_locker_unlock_seconds_total, "Seconds spent unlocking advisory job locks",
+        :que_locker_unlock_seconds_total, "Seconds spent unlocking job advisory locks",
       ),
       AcquireTotal = Prometheus::Client::Counter.new(
-        :que_locker_acquire_total, "Total number of job lock queries executed",
+        :que_locker_acquire_total, "Counter of number of job lock queries executed",
       ),
       AcquireSecondsTotal = Prometheus::Client::Counter.new(
         :que_locker_acquire_seconds_total, "Seconds spent running job lock query",

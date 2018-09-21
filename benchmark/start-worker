@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-bundle exec que \
+exec bundle exec que \
   --metrics-port 8080 \
   --worker-count "${WORKER_COUNT}" \
   --wake-interval "${WAKE_INTERVAL}" \

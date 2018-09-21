@@ -96,7 +96,7 @@ cursor_expiry  = options.cursor_expiry  || 0
 worker_count   = options.worker_count   || 1
 timeout        = options.timeout
 
-workers = Que::WorkerGroup.start(
+worker_group = Que::WorkerGroup.start(
   worker_count,
   queue: queue_name,
   wake_interval: wake_interval,
@@ -112,7 +112,7 @@ if options.metrics_port
     )
 
     app = Rack::Builder.new do
-      use Que::Middleware::WorkerCollector, workers: workers
+      use Que::Middleware::WorkerCollector, worker_group: worker_group
       use Prometheus::Middleware::Exporter
 
       run lambda { |env| [200, {}, ["healthy"]] }
@@ -129,4 +129,4 @@ if options.metrics_port
 end
 
 wait_for_signals("INT", "TERM")
-workers.stop(timeout)
+worker_group.stop(timeout)
