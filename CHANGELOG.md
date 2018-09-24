@@ -1,3 +1,7 @@
+### Unreleased
+
+*   JobTimeoutError < Interrupt, to avoid accidental rescuing
+
 ### 1.0.0 (2018-07-20)
 
 *   Refactor of Que internals
