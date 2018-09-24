@@ -185,7 +185,7 @@ module Que
                 duration: duration,
               )
             )
-          rescue => error
+          rescue StandardError, JobTimeoutError => error
             Que.logger&.error(
               log_keys.merge(
                 event: "que_job.job_error",
