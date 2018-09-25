@@ -111,12 +111,23 @@ if options.metrics_port
       port: options.metrics_port,
     )
 
-    app = Rack::Builder.new do
-      use Que::Middleware::WorkerCollector, worker_group: worker_group
-      use Prometheus::Middleware::Exporter
+    health_check = lambda { |env| [200, {}, ["healthy"]] }
+    app = Rack::URLMap.new(
+      "/" => Rack::Builder.new do
+        use Que::Middleware::WorkerCollector, worker_group: worker_group
+        use Prometheus::Middleware::Exporter
 
-      run lambda { |env| [200, {}, ["healthy"]] }
-    end
+        run health_check
+      end,
+      "/queue" => Rack::Builder.new do
+        registry = Prometheus::Client::Registry.new
+
+        use Que::Middleware::QueueCollector, registry: registry
+        use Prometheus::Middleware::Exporter, registry: registry
+
+        run health_check
+      end,
+    )
 
     Rack::Handler::WEBrick.run(
       app,
