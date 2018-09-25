@@ -84,7 +84,7 @@ module Que
     ensure
       if job
         observe(UnlockTotal, UnlockSecondsTotal) do
-          Que.execute("SELECT pg_advisory_unlock($1)", [job[:job_id]])
+          Que.execute("SELECT pg_advisory_unlock(:job_id)", [job_id: job[:job_id]])
         end
       end
     end
@@ -93,13 +93,13 @@ module Que
 
     def lock_job
       observe(AcquireTotal, AcquireSecondsTotal) do
-        Que.execute(:lock_job, [@queue, @cursor]).first
+        Que.execute(SQL[:lock_job], [queue: @queue, cursor: @cursor]).first
       end
     end
 
     def exists?(job)
       observe(ExistsTotal, ExistsSecondsTotal) do
-        Que.execute(:check_job, job.values_at(*Job::JOB_INSTANCE_FIELDS)).any? if job
+        Que.execute(SQL[:check_job], [job]).any? if job
       end
     end
 

@@ -50,8 +50,8 @@ module Que
         FROM (
           SELECT j
           FROM que_jobs AS j
-          WHERE queue = $1::text
-          AND job_id >= $2
+          WHERE queue = :queue
+          AND job_id >= :cursor
           AND run_at <= now()
           AND retryable = true
           ORDER BY priority, run_at, job_id
@@ -63,7 +63,7 @@ module Que
             SELECT (
               SELECT j
               FROM que_jobs AS j
-              WHERE queue = $1::text
+              WHERE queue = :queue
               AND run_at <= now()
               AND retryable = true
               AND (priority, run_at, job_id) > (jobs.priority, jobs.run_at, jobs.job_id)
@@ -86,38 +86,38 @@ module Que
     :check_job => %{
       SELECT 1 AS one
       FROM   que_jobs
-      WHERE  queue    = $1::text
+      WHERE  queue    = :queue
+      AND    priority = :priority
+      AND    run_at   = :run_at
+      AND    job_id   = :job_id
       AND    retryable = true
-      AND    priority = $2::smallint
-      AND    run_at   = $3::timestamptz
-      AND    job_id   = $4::bigint
     }.freeze,
 
     :set_error => %{
       UPDATE que_jobs
-      SET error_count = $1::integer,
-          run_at      = now() + $2::bigint * '1 second'::interval,
-          last_error  = $3::text
-      WHERE queue     = $4::text
-      AND   priority  = $5::smallint
-      AND   run_at    = $6::timestamptz
-      AND   job_id    = $7::bigint
+      SET error_count = :error_count,
+          run_at      = now() + :delay * '1 second'::interval,
+          last_error  = :last_error
+      WHERE queue     = :queue
+      AND   priority  = :priority
+      AND   run_at    = :run_at
+      AND   job_id    = :job_id
     }.freeze,
 
     :insert_job => %{
       INSERT INTO que_jobs
       (queue, priority, run_at, job_class, retryable, args)
       VALUES
-      (coalesce($1, '')::text, coalesce($2, 100)::smallint, coalesce($3, now())::timestamptz, $4::text, $5::bool, coalesce($6, '[]')::json)
+      (coalesce(:queue, ''), coalesce(:priority, 100), coalesce(:run_at, now()), :job_class, :retryable, coalesce(:args, '[]')::json)
       RETURNING *
     }.freeze,
 
     :destroy_job => %{
       DELETE FROM que_jobs
-      WHERE queue    = $1::text
-      AND   priority = $2::smallint
-      AND   run_at   = $3::timestamptz
-      AND   job_id   = $4::bigint
+      WHERE queue    = :queue
+      AND   priority = :priority
+      AND   run_at   = :run_at
+      AND   job_id   = :job_id
     }.freeze,
 
     :job_stats => %{

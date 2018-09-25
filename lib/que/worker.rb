@@ -140,7 +140,7 @@ module Que
     end
 
     def work
-      Que.adapter.checkout do
+      Que.adapter.connection_pool.with_connection do
         @locker.with_locked_job do |job|
           return :job_not_found if job.nil?
 
@@ -230,11 +230,12 @@ module Que
       count = job[:error_count].to_i + 1
 
       Que.execute(
-        :set_error, [
-          count,
-          count ** 4 + 3, # exponentially back off when retrying failures
-          "#{error.message}\n#{error.backtrace.join("\n")}",
-          *job.values_at(*Job::JOB_INSTANCE_FIELDS)
+        SQL[:set_error],
+        [
+          error_count: count,
+          delay: count ** 4 + 3, # exponentially back off when retrying failures
+          last_error: "#{error.message}\n#{error.backtrace.join("\n")}",
+          **job.slice(*Job::JOB_INSTANCE_FIELDS)
         ]
       )
     end

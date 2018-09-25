@@ -29,7 +29,7 @@ end
 establish_database_connection
 
 # Make sure our test database is prepared to run Que
-Que.connection = ActiveRecord
+Que.adapter = ActiveRecord::Base
 Que.migrate!
 
 # Ensure we have a logger, so that we can test the code paths that log

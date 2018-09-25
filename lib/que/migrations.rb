@@ -32,17 +32,17 @@ module Que
       end
 
       def db_version
-        result = Que.execute <<-SQL
+        rows = Que.execute <<-SQL
           SELECT relname, description
           FROM pg_class
           LEFT JOIN pg_description ON pg_description.objoid = pg_class.oid
           WHERE relname = 'que_jobs'
         SQL
 
-        if result.none?
+        if rows.none?
           # No table in the database at all.
           0
-        elsif (d = result.first[:description]).nil?
+        elsif (d = rows.first[:description]).nil?
           # There's a table, it was just created before the migration system existed.
           1
         else
