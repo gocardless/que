@@ -98,6 +98,9 @@ module Que
       # Integer, bigint, smallint:
       CAST_PROCS[23] = CAST_PROCS[20] = CAST_PROCS[21] = proc(&:to_i)
 
+      # Numeric
+      CAST_PROCS[1700] = proc(&:to_i)
+
       # Timestamp with time zone.
       CAST_PROCS[1184] = Time.method(:parse)
 
@@ -105,7 +108,7 @@ module Que
       CAST_PROCS[114] = -> (value) { JSON_MODULE.load(value, create_additions: false) }
 
       # Boolean:
-      CAST_PROCS[16] = 't'.method(:==)
+      CAST_PROCS[16] = -> (value) { value.class == String ? 't' == value : value }
 
       def cast_result(result)
         output = result.to_a
