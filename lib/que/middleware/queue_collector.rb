@@ -13,7 +13,8 @@ module Que
       )
 
       QUEUE_VIEW_SQL = <<~SQL.freeze
-        select queue, job_class, priority
+        select job_class, priority
+             , (case when (queue = '') then 'default' else queue end) as queue
              , (case when (retryable AND run_at < now()) then 'true' else 'false' end) as due
              , count(*)
           from que_jobs
