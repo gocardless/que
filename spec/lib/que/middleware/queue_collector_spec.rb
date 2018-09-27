@@ -23,9 +23,9 @@ RSpec.describe Que::Middleware::QueueCollector do
       collector.call({})
 
       expect(described_class::Queued.values).to eql(
-        {queue: "", job_class: "FakeJob", priority: 1, due: "true"} => 2.0,
-        {queue: "", job_class: "FakeJob", priority: 10, due: "true"} => 1.0,
-        {queue: "", job_class: "FakeJob", priority: 1, due: "false"} => 2.0,
+        {queue: "default", job_class: "FakeJob", priority: 1, due: "true"} => 2.0,
+        {queue: "default", job_class: "FakeJob", priority: 10, due: "true"} => 1.0,
+        {queue: "default", job_class: "FakeJob", priority: 1, due: "false"} => 2.0,
         {queue: "another", job_class: "FakeJob", priority: 1, due: "false"} => 1.0,
       )
     end

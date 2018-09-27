@@ -10,7 +10,7 @@ require_relative "job_timeout_error"
 module Que
   class Worker
     # Defines the time a worker will wait before checking Postgres for its next job
-    DEFAULT_QUEUE = ""
+    DEFAULT_QUEUE = "default"
     DEFAULT_WAKE_INTERVAL = 5
     DEFAULT_LOCK_CURSOR_EXPIRY = 0 # seconds
 

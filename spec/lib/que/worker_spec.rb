@@ -28,7 +28,7 @@ RSpec.describe Que::Worker do
             job_error_count: 0,
             msg: "Job acquired, beginning work",
             priority: 100,
-            queue: "",
+            queue: "default",
             que_job_id: job.attrs["job_id"],
           }))
 
@@ -41,7 +41,7 @@ RSpec.describe Que::Worker do
             job_error_count: 0,
             msg: "Successfully worked job",
             priority: 100,
-            queue: "",
+            queue: "default",
             que_job_id: job.attrs["job_id"],
           }))
 
@@ -117,7 +117,7 @@ RSpec.describe Que::Worker do
         it "rescues it and returns an error" do
           FakeJob.enqueue(1)
 
-          expect(Que).to receive(:execute).with(:lock_job, ["", 0]).and_raise(PG::Error)
+          expect(Que).to receive(:execute).with(:lock_job, ["default", 0]).and_raise(PG::Error)
           expect(subject).to eq(:postgres_error)
         end
       end
