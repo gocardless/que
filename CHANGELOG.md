@@ -1,6 +1,7 @@
 ### Unreleased
 
 *   JobTimeoutError < Interrupt, to avoid accidental rescuing
+*   Change default queue from '' to 'default'
 
 ### 1.0.0 (2018-07-20)
 
