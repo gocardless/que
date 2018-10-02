@@ -190,7 +190,7 @@ module Que
               log_keys.merge(
                 event: "que_job.job_error",
                 msg: "Job failed with error",
-                error: error.to_s,
+                error: error.inspect,
               )
             )
 

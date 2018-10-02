@@ -73,6 +73,7 @@ RSpec.describe Que::Worker do
             handler: "ExceptionalJob",
             job_class: "ExceptionalJob",
             msg: "Job failed with error",
+            error: "#<ExceptionalJob::Error: bad argument 1>",
           }))
 
         subject
