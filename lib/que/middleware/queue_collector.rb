@@ -11,6 +11,9 @@ module Que
       Queued = Prometheus::Client::Gauge.new(
         :que_queue_queued, "Number of jobs in the queue, by job_class/priority/due",
       )
+      DeadTuples = Prometheus::Client::Gauge.new(
+        :que_dead_tuples, "Number of dead tuples in the que_jobs table",
+      )
 
       QUEUE_VIEW_SQL = <<~SQL.freeze
         select queue, job_class, priority
@@ -18,6 +21,12 @@ module Que
              , count(*)
           from que_jobs
          group by 1, 2, 3, 4;
+      SQL
+
+      DEAD_TUPLES_SQL = <<~SQL.freeze
+        select n_dead_tup
+          from pg_stat_user_tables
+         where relname='que_jobs';
       SQL
 
       def initialize(app, options = {})
@@ -43,6 +52,9 @@ module Que
             labels["count"],
           )
         end
+
+        # DeadTuples has no labels, we can expect this to be a single numeric value
+        DeadTuples.set({}, Que.execute(DEAD_TUPLES_SQL).first&.fetch("n_dead_tup"))
 
         @app.call(env)
       end
