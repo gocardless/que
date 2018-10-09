@@ -186,6 +186,7 @@ module Que
               )
             )
           rescue StandardError, JobTimeoutError => error
+            JobErrorTotal.increment(labels, 1)
             Que.logger&.error(
               log_keys.merge(
                 event: "que_job.job_error",
