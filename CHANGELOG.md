@@ -3,6 +3,7 @@
 *   JobTimeoutError < Interrupt, to avoid accidental rescuing
 *   Change default queue from '' to 'default'
 *   Expose `que_dead_tuples` metric
+*   Fix-up metric constant names
 
 ### 1.0.0 (2018-07-20)
 

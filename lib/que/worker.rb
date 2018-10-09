@@ -21,16 +21,16 @@ module Que
       SleepingSecondsTotal = Prometheus::Client::Counter.new(
         :que_worker_sleeping_seconds_total, "Time spent sleeping due to no jobs",
       ),
-      JobsWorkedTotal = Prometheus::Client::Counter.new(
+      JobWorkedTotal = Prometheus::Client::Counter.new(
         :que_job_worked_total, "Counter for all jobs processed",
       ),
-      JobsErrorTotal = Prometheus::Client::Counter.new(
+      JobErrorTotal = Prometheus::Client::Counter.new(
         :que_job_error_total, "Counter for all jobs that were run but errored",
       ),
-      JobsWorkedSecondsTotal = Prometheus::Client::Counter.new(
+      JobWorkedSecondsTotal = Prometheus::Client::Counter.new(
         :que_job_worked_seconds_total, "Sum of the time spent processing each job class",
       ),
-      JobsLatencySecondsTotal = Prometheus::Client::Counter.new(
+      JobLatencySecondsTotal = Prometheus::Client::Counter.new(
         :que_job_latency_seconds_total, "Sum of time spent waiting in queue",
       ),
     ]
@@ -170,12 +170,12 @@ module Que
             # Note the time spent waiting in the queue before being processed, and update
             # the jobs worked count here so that latency_seconds_total / worked_total
             # doesn't suffer from skew.
-            JobsLatencySecondsTotal.increment(labels, job[:latency])
-            JobsWorkedTotal.increment(labels, 1)
+            JobLatencySecondsTotal.increment(labels, job[:latency])
+            JobWorkedTotal.increment(labels, 1)
 
             duration = Benchmark.measure do
               # TODO: _run -> run_and_destroy(*job[:args])
-              @tracer.trace(JobsWorkedSecondsTotal, labels) { klass.new(job)._run }
+              @tracer.trace(JobWorkedSecondsTotal, labels) { klass.new(job)._run }
             end.real
 
             Que.logger&.info(
@@ -186,6 +186,7 @@ module Que
               )
             )
           rescue StandardError, JobTimeoutError => error
+            JobErrorTotal.increment(labels, 1)
             Que.logger&.error(
               log_keys.merge(
                 event: "que_job.job_error",
