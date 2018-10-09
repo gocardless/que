@@ -28,6 +28,12 @@ RSpec.describe Que::Middleware::QueueCollector do
         {queue: "default", job_class: "FakeJob", priority: 1, due: "false"} => 2.0,
         {queue: "another", job_class: "FakeJob", priority: 1, due: "false"} => 1.0,
       )
+
+      # It's not easy to predict the number of dead tuples deterministically, so we just
+      # expect a float
+      expect(described_class::DeadTuples.values).to include(
+        {} => be_a(Float),
+      )
     end
 
     context "when called twice" do
