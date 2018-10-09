@@ -33,6 +33,7 @@ module Que
         @app = app
         @registry = options.fetch(:registry, Prometheus::Client.registry)
         @registry.register(Queued) rescue Prometheus::Client::Registry::AlreadyRegisteredError
+        @registry.register(DeadTuples) rescue Prometheus::Client::Registry::AlreadyRegisteredError
       end
 
       def call(env)
