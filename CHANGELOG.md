@@ -4,6 +4,7 @@
 *   Change default queue from '' to 'default'
 *   Expose `que_dead_tuples` metric
 *   Fix-up metric constant names
+*   Apply label to locker metrics to indicate cursor presence
 
 ### 1.0.0 (2018-07-20)
 
