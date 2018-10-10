@@ -92,7 +92,7 @@ module Que
     private
 
     def lock_job
-      observe(AcquireTotal, AcquireSecondsTotal) do
+      observe(AcquireTotal, AcquireSecondsTotal, cursor: @cursor == 0 ? "false" : "true") do
         Que.execute(:lock_job, [@queue, @cursor]).first
       end
     end
@@ -112,12 +112,12 @@ module Que
       @cursor_expires_at = monotonic_now + @cursor_expiry
     end
 
-    def observe(metric, metric_duration, &block)
+    def observe(metric, metric_duration, labels = {}, &block)
       now = monotonic_now
       block.call
     ensure
-      metric.increment({queue: @queue}, 1)
-      metric_duration.increment({queue: @queue}, monotonic_now - now)
+      metric.increment(labels.merge(queue: @queue), 1)
+      metric_duration.increment(labels.merge(queue: @queue), monotonic_now - now)
     end
 
     def monotonic_now
