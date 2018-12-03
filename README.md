@@ -137,3 +137,7 @@ This will iterate the specs one thousand times, each with a different ordering. 
     for i in {1..1000}; do LOG_SPEC=true bundle exec rspec -b --seed 329; done
 
 Note that we iterate because there's no guarantee that the hang would reappear with a single additional run, so we need to rerun the specs until it reappears. The LOG_SPEC parameter will output the name and file location of each spec before it is run, so you can easily tell which spec is hanging, and you can continue narrowing things down from there.
+
+TIP: If you're getting errors about the database not existing when you run the tests, run the following in a shell:
+
+`createdb que-test`
