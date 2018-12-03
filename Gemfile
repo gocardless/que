@@ -22,4 +22,8 @@ platforms :rbx do
   gem 'json', '~> 1.8'
 end
 
+gem 'prometheus-client',
+    git: 'https://github.com/gocardless/prometheus_client_ruby.git',
+    branch: 'gc_production_branch_do_not_push'
+
 gemspec
