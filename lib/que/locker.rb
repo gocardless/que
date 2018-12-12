@@ -16,22 +16,34 @@ module Que
   class Locker
     METRICS = [
       ExistsTotal = Prometheus::Client::Counter.new(
-        :que_locker_exists_total, "Counter of attempts to check job existence before locking",
+        :que_locker_exists_total,
+        docstring: "Counter of attempts to check job existence before locking",
+        labels: [:queue],
       ),
       ExistsSecondsTotal = Prometheus::Client::Counter.new(
-        :que_locker_exists_seconds_total, "Seconds spent checking job exists before locking",
+        :que_locker_exists_seconds_total,
+        docstring: "Seconds spent checking job exists before locking",
+        labels: [:queue],
       ),
       UnlockTotal = Prometheus::Client::Counter.new(
-        :que_locker_unlock_total, "Counter of attempts to unlock job advisory locks",
+        :que_locker_unlock_total,
+        docstring: "Counter of attempts to unlock job advisory locks",
+        labels: [:queue],
       ),
       UnlockSecondsTotal = Prometheus::Client::Counter.new(
-        :que_locker_unlock_seconds_total, "Seconds spent unlocking job advisory locks",
+        :que_locker_unlock_seconds_total,
+        docstring: "Seconds spent unlocking job advisory locks",
+        labels: [:queue],
       ),
       AcquireTotal = Prometheus::Client::Counter.new(
-        :que_locker_acquire_total, "Counter of number of job lock queries executed",
+        :que_locker_acquire_total,
+        docstring: "Counter of number of job lock queries executed",
+        labels: [:queue, :cursor],
       ),
       AcquireSecondsTotal = Prometheus::Client::Counter.new(
-        :que_locker_acquire_seconds_total, "Seconds spent running job lock query",
+        :que_locker_acquire_seconds_total,
+        docstring: "Seconds spent running job lock query",
+        labels: [:queue, :cursor],
       ),
     ]
 
@@ -116,8 +128,9 @@ module Que
       now = monotonic_now
       block.call
     ensure
-      metric.increment(labels.merge(queue: @queue), 1)
-      metric_duration.increment(labels.merge(queue: @queue), monotonic_now - now)
+      metric.increment(labels: labels.merge(queue: @queue))
+      metric_duration.increment(by: monotonic_now - now,
+                                labels: labels.merge(queue: @queue))
     end
 
     def monotonic_now

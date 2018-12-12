@@ -16,22 +16,34 @@ module Que
 
     METRICS = [
       RunningSecondsTotal = Prometheus::Client::Counter.new(
-        :que_worker_running_seconds_total, "Time since starting to work jobs",
+        :que_worker_running_seconds_total,
+        docstring: "Time since starting to work jobs",
+        labels: %i[queue worker],
       ),
       SleepingSecondsTotal = Prometheus::Client::Counter.new(
-        :que_worker_sleeping_seconds_total, "Time spent sleeping due to no jobs",
+        :que_worker_sleeping_seconds_total,
+        docstring: "Time spent sleeping due to no jobs",
+        labels: %i[queue worker],
       ),
       JobWorkedTotal = Prometheus::Client::Counter.new(
-        :que_job_worked_total, "Counter for all jobs processed",
+        :que_job_worked_total,
+        docstring: "Counter for all jobs processed",
+        labels: %i[job_class priority queue],
       ),
       JobErrorTotal = Prometheus::Client::Counter.new(
-        :que_job_error_total, "Counter for all jobs that were run but errored",
+        :que_job_error_total,
+        docstring: "Counter for all jobs that were run but errored",
+        labels: %i[job_class priority queue],
       ),
       JobWorkedSecondsTotal = Prometheus::Client::Counter.new(
-        :que_job_worked_seconds_total, "Sum of the time spent processing each job class",
+        :que_job_worked_seconds_total,
+        docstring: "Sum of the time spent processing each job class",
+        labels: %i[job_class priority queue worker],
       ),
       JobLatencySecondsTotal = Prometheus::Client::Counter.new(
-        :que_job_latency_seconds_total, "Sum of time spent waiting in queue",
+        :que_job_latency_seconds_total,
+        docstring: "Sum of time spent waiting in queue",
+        labels: %i[job_class priority queue],
       ),
     ]
 
@@ -66,8 +78,8 @@ module Que
             time_since = [now - trace.time, 0].max
             trace.time = now
             trace.metric.increment(
-              trace.labels.merge(worker: @worker.object_id),
-              time_since,
+              by: time_since,
+              labels: trace.labels.merge(worker: @worker.object_id),
             )
           end
         end
@@ -170,8 +182,8 @@ module Que
             # Note the time spent waiting in the queue before being processed, and update
             # the jobs worked count here so that latency_seconds_total / worked_total
             # doesn't suffer from skew.
-            JobLatencySecondsTotal.increment(labels, job[:latency])
-            JobWorkedTotal.increment(labels, 1)
+            JobLatencySecondsTotal.increment(by: job[:latency], labels: labels)
+            JobWorkedTotal.increment(labels: labels)
 
             duration = Benchmark.measure do
               # TODO: _run -> run_and_destroy(*job[:args])
@@ -186,7 +198,7 @@ module Que
               )
             )
           rescue StandardError, JobTimeoutError => error
-            JobErrorTotal.increment(labels, 1)
+            JobErrorTotal.increment(labels: labels)
             Que.logger&.error(
               log_keys.merge(
                 event: "que_job.job_error",

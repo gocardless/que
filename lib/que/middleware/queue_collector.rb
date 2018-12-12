@@ -9,10 +9,13 @@ module Que
     # before responding a scrape.
     class QueueCollector
       Queued = Prometheus::Client::Gauge.new(
-        :que_queue_queued, "Number of jobs in the queue, by job_class/priority/due",
+        :que_queue_queued,
+        docstring: "Number of jobs in the queue, by job_class/priority/due",
+        labels: [:queue, :job_class, :priority, :due]
       )
       DeadTuples = Prometheus::Client::Gauge.new(
-        :que_dead_tuples, "Number of dead tuples in the que_jobs table",
+        :que_dead_tuples,
+        docstring: "Number of dead tuples in the que_jobs table",
       )
 
       QUEUE_VIEW_SQL = <<~SQL.freeze
@@ -39,23 +42,23 @@ module Que
       def call(env)
         # Reset all the previously observed values back to zero, ensuring we only ever
         # report metric values that are current in every scrape.
-        Queued.values.each { |labels, _| Queued.set(labels, 0.0) }
+        Queued.values.each { |labels, _| Queued.set(0.0, labels: labels) }
 
         # Now we can safely update our gauges, touching only those that exist in our queue
         Que.execute(QUEUE_VIEW_SQL).each do |labels|
           Queued.set(
-            {
+            labels["count"],
+            labels: {
               queue: labels["queue"],
               job_class: labels["job_class"],
               priority: labels["priority"],
               due: labels["due"],
             },
-            labels["count"],
           )
         end
 
         # DeadTuples has no labels, we can expect this to be a single numeric value
-        DeadTuples.set({}, Que.execute(DEAD_TUPLES_SQL).first&.fetch("n_dead_tup"))
+        DeadTuples.set(Que.execute(DEAD_TUPLES_SQL).first&.fetch("n_dead_tup"))
 
         @app.call(env)
       end

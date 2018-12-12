@@ -24,5 +24,4 @@ jobs:
           key: gemfile-{{ .Branch }}-{{ checksum "Gemfile" }}
           paths:
             - "vendor/bundle"
-      - run: bundle exec ruby -r sequel -r ./lib/que -e 'Que.connection=Sequel.connect("postgres://localhost/que-test"); Que.migrate!'
       - run: bundle exec rspec
