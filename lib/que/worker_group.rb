@@ -16,6 +16,16 @@ module Que
       workers = Array.new(count) { Worker.new(**kwargs) }
       worker_threads = workers.map { |worker| Thread.new { worker.work_loop } }
 
+      # We want to ensure that our control flow for Que threads and our metric endpoints
+      # are prioritised above CPU intensive work of jobs. If people use the metrics
+      # endpoint as a liveness check then its essential we don't timeout when we do busy
+      # work.
+      #
+      # We can set our worker thread priority to be a value less than our parent thread to
+      # ensure this is the case. Different Ruby runtimes have different priority systems,
+      # but -10 should do the trick for all of them.
+      worker_threads.each { |thread| thread.priority = Thread.current.priority - 10 }
+
       new(workers, worker_threads)
     end
 
