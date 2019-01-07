@@ -10,7 +10,7 @@ module Que
     Que.json_converter = :with_indifferent_access.to_proc
 
     rake_tasks do
-      load 'que/rake_tasks.rb'
+      load "que/rake_tasks.rb"
     end
   end
 end

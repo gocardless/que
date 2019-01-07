@@ -38,14 +38,14 @@ module Que
       AcquireTotal = Prometheus::Client::Counter.new(
         :que_locker_acquire_total,
         docstring: "Counter of number of job lock queries executed",
-        labels: [:queue, :cursor],
+        labels: %i[queue cursor],
       ),
       AcquireSecondsTotal = Prometheus::Client::Counter.new(
         :que_locker_acquire_seconds_total,
         docstring: "Seconds spent running job lock query",
-        labels: [:queue, :cursor],
+        labels: %i[queue cursor],
       ),
-    ]
+    ].freeze
 
     def initialize(queue:, cursor_expiry:)
       @queue = queue
@@ -124,9 +124,9 @@ module Que
       @cursor_expires_at = monotonic_now + @cursor_expiry
     end
 
-    def observe(metric, metric_duration, labels = {}, &block)
+    def observe(metric, metric_duration, labels = {})
       now = monotonic_now
-      block.call
+      yield
     ensure
       metric.increment(labels: labels.merge(queue: @queue))
       metric_duration.increment(by: monotonic_now - now,

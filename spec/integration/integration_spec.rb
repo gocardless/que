@@ -13,6 +13,7 @@ RSpec.describe "multiple workers" do
     start = Time.now
     loop do
       break if QueJob.count == 0 || Time.now - start > timeout
+
       sleep 0.1
     end
   end
@@ -62,7 +63,7 @@ RSpec.describe "multiple workers" do
 
       expect(QueJob.count).to eq(0)
       expect(User.count).to eq(3)
-      expect(User.all.map(&:name).sort).to eq(["alice", "bob", "charlie"])
+      expect(User.all.map(&:name).sort).to eq(%w[alice bob charlie])
     end
   end
 
@@ -77,7 +78,7 @@ RSpec.describe "multiple workers" do
 
       sleep_job = QueJob.last
 
-      expect(sleep_job).not_to be(nil)
+      expect(sleep_job).to_not be(nil)
       expect(sleep_job.last_error).to match(/Job exceeded timeout when requested to stop/)
     end
   end

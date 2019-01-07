@@ -28,10 +28,8 @@ module Que
 
       def register(*metrics)
         metrics.each do |metric|
-          begin
-            @registry.register(metric)
-          rescue Prometheus::Client::Registry::AlreadyRegisteredError
-          end
+          @registry.register(metric)
+        rescue Prometheus::Client::Registry::AlreadyRegisteredError
         end
       end
     end

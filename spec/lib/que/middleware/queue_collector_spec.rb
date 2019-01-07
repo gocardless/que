@@ -3,7 +3,7 @@
 require "spec_helper"
 
 RSpec.describe Que::Middleware::QueueCollector do
-  subject(:collector) { described_class.new(-> (env) { nil }) }
+  subject(:collector) { described_class.new(->(_env) { nil }) }
 
   let(:now) { postgres_now }
   let(:due_now) { now - 1000 }
@@ -23,10 +23,10 @@ RSpec.describe Que::Middleware::QueueCollector do
       collector.call({})
 
       expect(described_class::Queued.values).to eql(
-        {queue: "default", job_class: "FakeJob", priority: 1, due: "true"} => 2.0,
-        {queue: "default", job_class: "FakeJob", priority: 10, due: "true"} => 1.0,
-        {queue: "default", job_class: "FakeJob", priority: 1, due: "false"} => 2.0,
-        {queue: "another", job_class: "FakeJob", priority: 1, due: "false"} => 1.0,
+        { queue: "default", job_class: "FakeJob", priority: 1, due: "true" } => 2.0,
+        { queue: "default", job_class: "FakeJob", priority: 10, due: "true" } => 1.0,
+        { queue: "default", job_class: "FakeJob", priority: 1, due: "false" } => 2.0,
+        { queue: "another", job_class: "FakeJob", priority: 1, due: "false" } => 1.0,
       )
 
       # It's not easy to predict the number of dead tuples deterministically, so we just

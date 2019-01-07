@@ -16,10 +16,10 @@ require_relative "que/middleware/queue_collector"
 
 module Que
   begin
-    require 'multi_json'
+    require "multi_json"
     JSON_MODULE = MultiJson
   rescue LoadError
-    require 'json'
+    require "json"
     JSON_MODULE = JSON
   end
 
@@ -58,15 +58,15 @@ module Que
 
     def connection=(connection)
       self.adapter =
-        if connection.to_s == 'ActiveRecord'
+        if connection.to_s == "ActiveRecord"
           Adapters::ActiveRecord.new
         else
           case connection.class.to_s
-          when 'Sequel::Postgres::Database' then Adapters::Sequel.new(connection)
-          when 'ConnectionPool'             then Adapters::ConnectionPool.new(connection)
-          when 'PG::Connection'             then Adapters::PG.new(connection)
-          when 'Pond'                       then Adapters::Pond.new(connection)
-          when 'NilClass'                   then connection
+          when "Sequel::Postgres::Database" then Adapters::Sequel.new(connection)
+          when "ConnectionPool"             then Adapters::ConnectionPool.new(connection)
+          when "PG::Connection"             then Adapters::PG.new(connection)
+          when "Pond"                       then Adapters::Pond.new(connection)
+          when "NilClass"                   then connection
           else raise "Que connection not recognized: #{connection.inspect}"
           end
         end
@@ -101,18 +101,18 @@ module Que
       Migrations.db_version
     end
 
-    def migrate!(version = {:version => Migrations::CURRENT_VERSION})
+    def migrate!(version = { version: Migrations::CURRENT_VERSION })
       Migrations.migrate!(version)
     end
 
     # Have to support create! and drop! in old migrations. They just created
     # and dropped the bare table.
     def create!
-      migrate! :version => 1
+      migrate! version: 1
     end
 
     def drop!
-      migrate! :version => 0
+      migrate! version: 0
     end
 
     def logger
@@ -128,7 +128,7 @@ module Que
         # Use ActiveSupport's version if it exists.
         camel_cased_word.constantize
       else
-        camel_cased_word.split('::').inject(Object, &:const_get)
+        camel_cased_word.split("::").inject(Object, &:const_get)
       end
     end
 
@@ -144,11 +144,11 @@ module Que
           begin
             execute "BEGIN"
             yield
-          rescue => error
+          rescue StandardError => error
             raise
           ensure
             # Handle a raised error or a killed thread.
-            if error || Thread.current.status == 'aborting'
+            if error || Thread.current.status == "aborting"
               execute "ROLLBACK"
             else
               execute "COMMIT"
@@ -166,4 +166,4 @@ module Que
   end
 end
 
-require 'que/railtie' if defined? Rails::Railtie
+require "que/railtie" if defined? Rails::Railtie

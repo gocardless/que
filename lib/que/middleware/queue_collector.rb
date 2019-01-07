@@ -11,14 +11,14 @@ module Que
       Queued = Prometheus::Client::Gauge.new(
         :que_queue_queued,
         docstring: "Number of jobs in the queue, by job_class/priority/due",
-        labels: [:queue, :job_class, :priority, :due]
+        labels: %i[queue job_class priority due],
       )
       DeadTuples = Prometheus::Client::Gauge.new(
         :que_dead_tuples,
         docstring: "Number of dead tuples in the que_jobs table",
       )
 
-      QUEUE_VIEW_SQL = <<~SQL.freeze
+      QUEUE_VIEW_SQL = <<~SQL
         select queue, job_class, priority
              , (case when (retryable AND run_at < now()) then 'true' else 'false' end) as due
              , count(*)
@@ -26,7 +26,7 @@ module Que
          group by 1, 2, 3, 4;
       SQL
 
-      DEAD_TUPLES_SQL = <<~SQL.freeze
+      DEAD_TUPLES_SQL = <<~SQL
         select n_dead_tup
           from pg_stat_user_tables
          where relname='que_jobs';
@@ -35,8 +35,16 @@ module Que
       def initialize(app, options = {})
         @app = app
         @registry = options.fetch(:registry, Prometheus::Client.registry)
-        @registry.register(Queued) rescue Prometheus::Client::Registry::AlreadyRegisteredError
-        @registry.register(DeadTuples) rescue Prometheus::Client::Registry::AlreadyRegisteredError
+        begin
+          @registry.register(Queued)
+        rescue StandardError
+          Prometheus::Client::Registry::AlreadyRegisteredError
+        end
+        begin
+          @registry.register(DeadTuples)
+        rescue StandardError
+          Prometheus::Client::Registry::AlreadyRegisteredError
+        end
       end
 
       def call(env)

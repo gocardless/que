@@ -39,7 +39,7 @@ module Que
           # no-op
         end
 
-        def committed!(should_run_callbacks = true)
+        def committed!(_should_run_callbacks = true)
           Que.wake!
         end
 

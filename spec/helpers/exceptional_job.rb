@@ -18,7 +18,7 @@ class ExceptionalJob < Que::Job
     @log = []
 
     def self.handle_job_failure(error, job)
-      self.log << [:handle_job_failure, error, job]
+      log << [:handle_job_failure, error, job]
     end
   end
 end

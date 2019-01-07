@@ -1,2 +1,5 @@
 inherit_gem:
   gc_ruboconfig: rubocop.yml
+
+AllCops:
+  Exclude: [legacy_spec/**/*]

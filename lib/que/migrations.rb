@@ -8,17 +8,17 @@ module Que
     CURRENT_VERSION = 4
 
     class << self
-      def migrate!(options = {:version => CURRENT_VERSION})
+      def migrate!(options = { version: CURRENT_VERSION })
         Que.transaction do
           version = options[:version]
 
           if (current = db_version) == version
             return
           elsif current < version
-            direction = 'up'
+            direction = "up"
             steps = ((current + 1)..version).to_a
           elsif current > version
-            direction = 'down'
+            direction = "down"
             steps = ((version + 1)..current).to_a.reverse
           end
 
