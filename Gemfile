@@ -9,6 +9,8 @@ group :development, :test do
   gem 'pond',            :require => nil
   gem 'pg',              :require => nil, :platform => :ruby
   gem 'pg_jruby',        :require => nil, :platform => :jruby
+  gem 'rubocop'
+  gem 'gc_ruboconfig'
 end
 
 group :test do
