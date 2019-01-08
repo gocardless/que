@@ -6,3 +6,9 @@ AllCops:
 
 Metrics/MethodLength:
   Max: 20
+
+RSpec/MultipleExpectations:
+  Enabled: false
+
+RSpec/NestedGroups:
+  Max: 5
