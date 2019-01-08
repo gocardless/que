@@ -19,5 +19,8 @@ RSpec/NamedSubject:
 RSpec/ExampleLength:
   Enabled: false
 
+RSpec/DescribeClass:
+  Enabled: false
+
 Metrics/CyclomaticComplexity:
   Max: 10

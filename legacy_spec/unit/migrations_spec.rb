@@ -32,9 +32,9 @@ describe Que::Migrations do
 
   it "should be able to get and set the current schema version" do
     Que::Migrations.db_version.should == Que::Migrations::CURRENT_VERSION
-    Que::Migrations.set_db_version(59328)
-    Que::Migrations.db_version.should == 59328
-    Que::Migrations.set_db_version(Que::Migrations::CURRENT_VERSION)
+    described_class.db_version = 59328
+    described_class.db_version.should == 59328
+    described_class.db_version = Que::Migrations::CURRENT_VERSION
     Que::Migrations.db_version.should == Que::Migrations::CURRENT_VERSION
   end
 

@@ -29,7 +29,7 @@ module Que
             Que.execute(sql)
           end
 
-          set_db_version(version)
+          self.db_version = version
         end
       end
       # rubocop:enable Metrics/AbcSize
@@ -53,7 +53,7 @@ module Que
         end
       end
 
-      def set_db_version(version)
+      def db_version=(version)
         i = version.to_i
         Que.execute "COMMENT ON TABLE que_jobs IS '#{i}'" unless i.zero?
       end

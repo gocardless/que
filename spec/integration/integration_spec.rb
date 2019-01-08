@@ -4,8 +4,8 @@ require "spec_helper"
 require "que/worker" # required to prevent autoload races
 
 RSpec.describe "multiple workers" do
-  def with_workers(n, stop_timeout: 5)
-    Que::WorkerGroup.start(n, wake_interval: 0.01).tap { yield }.stop(stop_timeout)
+  def with_workers(num, stop_timeout: 5)
+    Que::WorkerGroup.start(num, wake_interval: 0.01).tap { yield }.stop(stop_timeout)
   end
 
   # Wait for a maximum of [timeout] seconds for all jobs to be worked
@@ -20,7 +20,7 @@ RSpec.describe "multiple workers" do
 
   context "with one worker and many jobs" do
     it "works each job exactly once" do
-      10.times.map { |i| FakeJob.enqueue(i) }
+      10.times.each { |i| FakeJob.enqueue(i) }
 
       expect(QueJob.count).to eq(10)
 
