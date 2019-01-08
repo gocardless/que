@@ -7,7 +7,11 @@ module Que
     DEFAULT_STOP_TIMEOUT = 5 # seconds
 
     def self.start(count, **kwargs)
-      Que.logger.info(msg: "Starting workers", event: "que.worker.start", worker_count: count)
+      Que.logger.info(
+        msg: "Starting workers",
+        event: "que.worker.start",
+        worker_count: count,
+      )
 
       workers = Array.new(count) { Worker.new(**kwargs) }
       worker_threads = workers.map { |worker| Thread.new { worker.work_loop } }

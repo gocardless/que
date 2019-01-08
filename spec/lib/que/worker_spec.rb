@@ -118,7 +118,8 @@ RSpec.describe Que::Worker do
         it "rescues it and returns an error" do
           FakeJob.enqueue(1)
 
-          expect(Que).to receive(:execute).with(:lock_job, ["default", 0]).and_raise(PG::Error)
+          expect(Que).
+            to receive(:execute).with(:lock_job, ["default", 0]).and_raise(PG::Error)
           expect(subject).to eq(:postgres_error)
         end
       end

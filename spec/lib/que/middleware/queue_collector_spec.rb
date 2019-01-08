@@ -13,9 +13,13 @@ RSpec.describe Que::Middleware::QueueCollector do
     FakeJob.enqueue(run_at: due_now, priority: 1) # due, should be runnable
     FakeJob.enqueue(run_at: due_now, priority: 1) # same as above, for 2nd count
     FakeJob.enqueue(run_at: due_now, priority: 10) # due, different priority
-    FakeJob.enqueue(run_at: due_now, priority: 1, retryable: false) # scheduled, not runnable
+
+    # scheduled, not runnable
+    FakeJob.enqueue(run_at: due_now, priority: 1, retryable: false)
     FakeJob.enqueue(run_at: pending_now, priority: 1) # not due
-    FakeJob.enqueue(run_at: pending_now, queue: "another", priority: 1) # not due, different queue
+
+    # not due, different queue
+    FakeJob.enqueue(run_at: pending_now, queue: "another", priority: 1)
   end
 
   describe ".call" do

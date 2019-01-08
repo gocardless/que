@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 namespace :que do
-  desc "Migrate Que's job table to the most recent version (creating it if it doesn't exist)"
+  desc "Migrate Que's job table to the most recent version (creating it if necessary)"
   task migrate: :environment do
     Que.migrate!
   end

@@ -37,7 +37,8 @@ module Que
       def execute(command, params = [])
         params = params.map do |param|
           case param
-            # The pg gem unfortunately doesn't convert fractions of time instances, so cast them to a string.
+          # The pg gem unfortunately doesn't convert fractions of time instances, so cast
+          # them to a string.
           when Time then param.strftime("%Y-%m-%d %H:%M:%S.%6N %z")
           when Array, Hash then JSON_MODULE.dump(param)
           else param
@@ -66,7 +67,9 @@ module Que
         checkout do |conn|
           # Prepared statement errors have the potential to foul up the entire
           # transaction, so if we're in one, err on the side of safety.
-          return execute_sql(SQL[name], params) if Que.disable_prepared_statements || in_transaction?
+          if Que.disable_prepared_statements || in_transaction?
+            return execute_sql(SQL[name], params)
+          end
 
           statements = @prepared_statements[conn] ||= {}
 
@@ -110,7 +113,8 @@ module Que
         output = result.to_a
 
         result.fields.each_with_index do |field, index|
-          next unless converter = CAST_PROCS[result.ftype(index)]
+          converter = CAST_PROCS[result.ftype(index)]
+          next unless converter
 
           output.each do |hash|
             unless (value = hash[field]).nil?

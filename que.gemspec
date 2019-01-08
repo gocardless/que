@@ -9,7 +9,8 @@ Gem::Specification.new do |spec|
   spec.version       = Que::Version
   spec.authors       = ["Chris Hanks"]
   spec.email         = ["christopher.m.hanks@gmail.com"]
-  spec.description   = "A job queue that uses PostgreSQL's advisory locks for speed and reliability."
+  spec.description   =
+    "A job queue that uses PostgreSQL's advisory locks for speed and reliability."
   spec.summary       = "A PostgreSQL-based Job Queue"
   spec.homepage      = "https://github.com/chanks/que"
   spec.license       = "MIT"

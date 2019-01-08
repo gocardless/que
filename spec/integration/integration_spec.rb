@@ -46,7 +46,9 @@ RSpec.describe "multiple workers" do
 
   context "with multiple jobs" do
     around do |example|
-      ActiveRecord::Base.connection.execute("CREATE TABLE IF NOT EXISTS users ( name text )")
+      ActiveRecord::Base.connection.execute(
+        "CREATE TABLE IF NOT EXISTS users ( name text )",
+      )
       User.delete_all
       example.run
       ActiveRecord::Base.connection.execute("DROP TABLE users")

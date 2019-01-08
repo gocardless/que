@@ -104,7 +104,8 @@ module Que
     private
 
     def lock_job
-      observe(AcquireTotal, AcquireSecondsTotal, cursor: @cursor == 0 ? "false" : "true") do
+      cursor = @cursor.zero? ? "false" : "true"
+      observe(AcquireTotal, AcquireSecondsTotal, cursor: cursor) do
         Que.execute(:lock_job, [@queue, @cursor]).first
       end
     end

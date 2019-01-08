@@ -109,8 +109,8 @@ module Que
         collect(matching)
       end
 
-      # We're doing duration arithmetic which should make use of monotonic clocks, to avoid
-      # changes to the system time from affecting our metrics.
+      # We're doing duration arithmetic which should make use of monotonic clocks, to
+      # avoid changes to the system time from affecting our metrics.
       def monotonic_now
         Process.clock_gettime(Process::CLOCK_MONOTONIC)
       end

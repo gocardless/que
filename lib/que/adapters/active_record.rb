@@ -10,7 +10,9 @@ module Que
       def wake_worker_after_commit
         # Works with ActiveRecord 3.2 and 4 (possibly earlier, didn't check)
         if in_transaction?
-          checkout_activerecord_adapter { |adapter| adapter.add_transaction_record(TransactionCallback.new) }
+          checkout_activerecord_adapter do |adapter|
+            adapter.add_transaction_record(TransactionCallback.new)
+          end
         else
           Que.wake!
         end

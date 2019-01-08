@@ -12,6 +12,7 @@ $stdout.sync = true
 
 options = OpenStruct.new
 
+# rubocop:disable Metrics/LineLength
 OptionParser.new do |opts|
   opts.banner = "usage: que [options] file/to/require ..."
 
@@ -54,6 +55,7 @@ OptionParser.new do |opts|
     exit 0
   end
 end.parse!(ARGV)
+# rubocop:enable Metrics/LineLength
 
 if ARGV.length.zero?
   $stdout.puts <<~OUTPUT
