@@ -8,6 +8,7 @@ module Que
     CURRENT_VERSION = 4
 
     class << self
+      # rubocop:disable Metrics/AbcSize
       def migrate!(options = { version: CURRENT_VERSION })
         Que.transaction do
           version = options[:version]
@@ -31,6 +32,7 @@ module Que
           set_db_version(version)
         end
       end
+      # rubocop:enable Metrics/AbcSize
 
       def db_version
         result = Que.execute <<-SQL

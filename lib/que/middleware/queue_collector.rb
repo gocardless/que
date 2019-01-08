@@ -47,6 +47,7 @@ module Que
         end
       end
 
+      # rubocop:disable Metrics/AbcSize
       def call(env)
         # Reset all the previously observed values back to zero, ensuring we only ever
         # report metric values that are current in every scrape.
@@ -70,6 +71,7 @@ module Que
 
         @app.call(env)
       end
+      # rubocop:enable Metrics/AbcSize
     end
   end
 end

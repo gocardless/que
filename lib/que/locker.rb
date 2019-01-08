@@ -58,6 +58,8 @@ module Que
     # calling the given block will cause the worker to immediately retry locking a job-
     # yielding with nil means there were no jobs to lock, and the worker will pause before
     # retrying.
+    # rubocop:disable Metrics/AbcSize
+    # rubocop:disable Metrics/PerceivedComplexity
     def with_locked_job
       reset_cursor if cursor_expired?
 
@@ -100,6 +102,8 @@ module Que
         end
       end
     end
+    # rubocop:enable Metrics/AbcSize
+    # rubocop:enable Metrics/PerceivedComplexity
 
     private
 

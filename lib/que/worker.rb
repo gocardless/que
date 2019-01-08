@@ -152,6 +152,7 @@ module Que
     end
 
     # rubocop:disable Metrics/MethodLength
+    # rubocop:disable Metrics/AbcSize
     def work
       Que.adapter.checkout do
         @locker.with_locked_job do |job|
@@ -225,6 +226,7 @@ module Que
       :postgres_error
     end
     # rubocop:enable Metrics/MethodLength
+    # rubocop:enable Metrics/AbcSize
 
     def stop!
       @stop = true
