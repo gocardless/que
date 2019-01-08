@@ -23,7 +23,7 @@ module Que
     JSON_MODULE = JSON
   end
 
-  HASH_DEFAULT_PROC = proc { |hash, key| hash[key.to_s] if Symbol === key }
+  HASH_DEFAULT_PROC = proc { |hash, key| hash[key.to_s] if key.is_a?(Symbol) }
 
   INDIFFERENTIATOR = proc do |object|
     case object

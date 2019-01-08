@@ -1,6 +1,8 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+# frozen_string_literal: true
+
 require "logger"
 require "optparse"
 require "ostruct"
@@ -76,9 +78,8 @@ end
 Que.logger ||= Logger.new(STDOUT)
 
 begin
-  if log_level = (options.log_level || ENV["QUE_LOG_LEVEL"])
-    Que.logger.level = Logger.const_get(log_level.upcase)
-  end
+  log_level = (options.log_level || ENV["QUE_LOG_LEVEL"])
+  Que.logger.level = Logger.const_get(log_level.upcase) if log_level
 rescue NameError
   $stdout.puts "Bad logging level: #{log_level}"
   exit 1
@@ -112,7 +113,7 @@ if options.metrics_port
       port: options.metrics_port,
     )
 
-    health_check = ->(_env) { [200, {}, ["healthy"]] }
+    health_check = ->(_) { [200, {}, ["healthy"]] }
     app = Rack::URLMap.new(
       "/" => Rack::Builder.new do
         use Que::Middleware::WorkerCollector, worker_group: worker_group

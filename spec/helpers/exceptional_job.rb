@@ -9,9 +9,9 @@ class ExceptionalJob < Que::Job
 
   class Error < StandardError; end
 
-  def run(x)
-    self.class.log << [:run, x]
-    raise Error, "bad argument #{x}"
+  def run(arg)
+    self.class.log << [:run, arg]
+    raise Error, "bad argument #{arg}"
   end
 
   class WithFailureHandler < self

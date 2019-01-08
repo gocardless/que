@@ -88,15 +88,13 @@ RSpec.describe Que::Locker do
         expect_to_work(job_1)
       end
 
+      # rubocop:disable RSpec/SubjectStub
+      # rubocop:disable RSpec/InstanceVariable
       context "on subsequent locks" do
         context "with non-zero cursor expiry" do
           let(:cursor_expiry) { 5 }
 
-          before do
-            allow(locker).to receive(:monotonic_now) do
-              @epoch
-            end
-          end
+          before { allow(locker).to receive(:monotonic_now) { @epoch } }
 
           # This test simulates the repeated locking of jobs. We're trying to prove that
           # the locker will use the previous jobs ID as a cursor until the expiry has
@@ -119,6 +117,8 @@ RSpec.describe Que::Locker do
           end
         end
       end
+      # rubocop:enable RSpec/SubjectStub
+      # rubocop:enable RSpec/InstanceVariable
     end
   end
 end

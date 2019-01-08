@@ -95,19 +95,20 @@ module Que
         end
       end
 
-      CAST_PROCS = {}.freeze
-
-      # Integer, bigint, smallint:
-      CAST_PROCS[23] = CAST_PROCS[20] = CAST_PROCS[21] = proc(&:to_i)
-
-      # Timestamp with time zone.
-      CAST_PROCS[1184] = Time.method(:parse)
-
-      # JSON.
-      CAST_PROCS[114] = ->(value) { JSON_MODULE.load(value, create_additions: false) }
-
-      # Boolean:
-      CAST_PROCS[16] = "t".method(:==)
+      CAST_PROCS = {
+        # booleans
+        16 => "t".method(:==),
+        # bigint
+        20 => proc(&:to_i),
+        # smallint
+        21 => proc(&:to_i),
+        # integer
+        23 => proc(&:to_i),
+        # json
+        114 => ->(value) { JSON_MODULE.load(value, create_additions: false) },
+        # timestamp with time zone
+        1184 => Time.method(:parse),
+      }.freeze
 
       def cast_result(result)
         output = result.to_a

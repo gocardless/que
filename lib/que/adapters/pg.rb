@@ -7,14 +7,14 @@ module Que
     class PG < Base
       attr_reader :lock
 
-      def initialize(pg)
-        @pg   = pg
+      def initialize(connection)
+        @connection = connection
         @lock = Monitor.new # Must be re-entrant.
         super
       end
 
       def checkout
-        @lock.synchronize { yield @pg }
+        @lock.synchronize { yield @connection }
       end
     end
   end
