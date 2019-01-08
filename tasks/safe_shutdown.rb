@@ -15,6 +15,7 @@
 # like it should). This task only explicitly tests Sequel, but the behavior
 # for ActiveRecord is very similar.
 
+# rubocop:disable Style/GlobalVars
 task :safe_shutdown do
   require "sequel"
   require "que"
@@ -67,3 +68,4 @@ task :safe_shutdown do
     break if stop
   end
 end
+# rubocop:enable Style/GlobalVars
