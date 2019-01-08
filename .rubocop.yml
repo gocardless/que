@@ -3,3 +3,6 @@ inherit_gem:
 
 AllCops:
   Exclude: [legacy_spec/**/*]
+
+Metrics/MethodLength:
+  Max: 20

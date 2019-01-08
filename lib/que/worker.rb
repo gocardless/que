@@ -151,6 +151,7 @@ module Que
       @stopped = true
     end
 
+    # rubocop:disable Metrics/MethodLength
     def work
       Que.adapter.checkout do
         @locker.with_locked_job do |job|
@@ -223,6 +224,7 @@ module Que
       # the work loop. Instead, we should let the work loop sleep and retry.
       :postgres_error
     end
+    # rubocop:enable Metrics/MethodLength
 
     def stop!
       @stop = true
