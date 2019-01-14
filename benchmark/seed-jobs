@@ -1,4 +1,5 @@
 #!/usr/bin/env ruby
+# frozen_string_literal: true
 
 require_relative "setup"
 
@@ -14,11 +15,13 @@ unless ARGV.count == 3
 
   USAGE
 
-  exit -1
+  exit(-1)
 end
 
 def parse_range(token)
-  [*Range.new(*token.split("..").map(&:to_i))] rescue [token.to_i]
+  [*Range.new(*token.split("..").map(&:to_i))]
+rescue StandardError
+  [token.to_i]
 end
 
 now = Time.now

@@ -21,29 +21,29 @@ RSpec.describe Que::Worker do
 
       it "logs the work" do
         expect(Que.logger).to receive(:info).
-          with(hash_including({
-            event: "que_job.job_begin",
-            handler: "FakeJob",
-            job_class: "FakeJob",
-            job_error_count: 0,
-            msg: "Job acquired, beginning work",
-            priority: 100,
-            queue: "default",
-            que_job_id: job.attrs["job_id"],
-          }))
+          with(hash_including(
+                 event: "que_job.job_begin",
+                 handler: "FakeJob",
+                 job_class: "FakeJob",
+                 job_error_count: 0,
+                 msg: "Job acquired, beginning work",
+                 priority: 100,
+                 queue: "default",
+                 que_job_id: job.attrs["job_id"],
+               ))
 
         expect(Que.logger).to receive(:info).
-          with(hash_including({
-            duration: kind_of(Float),
-            event: "que_job.job_worked",
-            handler: "FakeJob",
-            job_class: "FakeJob",
-            job_error_count: 0,
-            msg: "Successfully worked job",
-            priority: 100,
-            queue: "default",
-            que_job_id: job.attrs["job_id"],
-          }))
+          with(hash_including(
+                 duration: kind_of(Float),
+                 event: "que_job.job_worked",
+                 handler: "FakeJob",
+                 job_class: "FakeJob",
+                 job_error_count: 0,
+                 msg: "Successfully worked job",
+                 priority: 100,
+                 queue: "default",
+                 que_job_id: job.attrs["job_id"],
+               ))
 
         subject
       end
@@ -60,21 +60,21 @@ RSpec.describe Que::Worker do
         ExceptionalJob.enqueue(1)
 
         expect(Que.logger).to receive(:info).
-          with(hash_including({
-            event: "que_job.job_begin",
-            handler: "ExceptionalJob",
-            job_class: "ExceptionalJob",
-            msg: "Job acquired, beginning work",
-          }))
+          with(hash_including(
+                 event: "que_job.job_begin",
+                 handler: "ExceptionalJob",
+                 job_class: "ExceptionalJob",
+                 msg: "Job acquired, beginning work",
+               ))
 
         expect(Que.logger).to receive(:error).
-          with(hash_including({
-            event: "que_job.job_error",
-            handler: "ExceptionalJob",
-            job_class: "ExceptionalJob",
-            msg: "Job failed with error",
-            error: "#<ExceptionalJob::Error: bad argument 1>",
-          }))
+          with(hash_including(
+                 event: "que_job.job_error",
+                 handler: "ExceptionalJob",
+                 job_class: "ExceptionalJob",
+                 msg: "Job failed with error",
+                 error: "#<ExceptionalJob::Error: bad argument 1>",
+               ))
 
         subject
       end
@@ -118,7 +118,8 @@ RSpec.describe Que::Worker do
         it "rescues it and returns an error" do
           FakeJob.enqueue(1)
 
-          expect(Que).to receive(:execute).with(:lock_job, ["default", 0]).and_raise(PG::Error)
+          expect(Que).
+            to receive(:execute).with(:lock_job, ["default", 0]).and_raise(PG::Error)
           expect(subject).to eq(:postgres_error)
         end
       end

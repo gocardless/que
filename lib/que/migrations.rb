@@ -8,28 +8,31 @@ module Que
     CURRENT_VERSION = 4
 
     class << self
-      def migrate!(options = {:version => CURRENT_VERSION})
+      # rubocop:disable Metrics/AbcSize
+      def migrate!(options = { version: CURRENT_VERSION })
         Que.transaction do
           version = options[:version]
 
           if (current = db_version) == version
             return
           elsif current < version
-            direction = 'up'
+            direction = "up"
             steps = ((current + 1)..version).to_a
           elsif current > version
-            direction = 'down'
+            direction = "down"
             steps = ((version + 1)..current).to_a.reverse
           end
 
           steps.each do |step|
-            sql = File.read("#{File.dirname(__FILE__)}/migrations/#{step}/#{direction}.sql")
+            sql =
+              File.read("#{File.dirname(__FILE__)}/migrations/#{step}/#{direction}.sql")
             Que.execute(sql)
           end
 
-          set_db_version(version)
+          self.db_version = version
         end
       end
+      # rubocop:enable Metrics/AbcSize
 
       def db_version
         result = Que.execute <<-SQL
@@ -50,7 +53,7 @@ module Que
         end
       end
 
-      def set_db_version(version)
+      def db_version=(version)
         i = version.to_i
         Que.execute "COMMENT ON TABLE que_jobs IS '#{i}'" unless i.zero?
       end

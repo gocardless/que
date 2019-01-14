@@ -5,5 +5,5 @@ module Que
   # terminate, and often precedes an incoming SIGKILL. It inherits from Interrupt to avoid
   # bare rescues (or those that catch StandardError) from catching the error, instead
   # being caught only by rescues that are absolutely sure they want to catch it.
-  class JobTimeoutError < Interrupt; end
+  class JobTimeoutError < RuntimeError; end
 end

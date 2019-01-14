@@ -7,26 +7,26 @@ RSpec.describe Que::Job do
     let(:run_at) { postgres_now }
 
     it "adds job to que_jobs table" do
-      expect { Que::Job.enqueue(:hello, run_at: run_at) }.
-        to change { QueJob.count }.
+      expect { described_class.enqueue(:hello, run_at: run_at) }.
+        to change(QueJob, :count).
         from(0).to(1)
 
       job = QueJob.last
 
-      expect(job.id).not_to be_nil
+      expect(job.id).to_not be_nil
       expect(job.run_at).to eql(run_at)
       expect(job.args).to eql(["hello"])
     end
 
     context "with no args" do
       it "adds job to que_jobs table, setting a run_at of the current time" do
-        expect { Que::Job.enqueue }.
-          to change { QueJob.count }.
+        expect { described_class.enqueue }.
+          to change(QueJob, :count).
           from(0).to(1)
 
         job = QueJob.last
 
-        expect(job.id).not_to be_nil
+        expect(job.id).to_not be_nil
         expect(job.run_at).to be < postgres_now
         expect(job.args).to eql([])
       end
@@ -37,11 +37,11 @@ RSpec.describe Que::Job do
       queue: "a_queue",
       priority: 10,
       run_at: postgres_now,
-      retryable: true
+      retryable: true,
     }
 
     (1..fake_args.keys.count).
-      map { |n| fake_args.keys.combination(n).to_a }.flatten(1).each do |arg_keys|
+      flat_map { |n| fake_args.keys.combination(n).to_a }.each do |arg_keys|
       context "with #{arg_keys.inspect}" do
         let(:args) { Hash[arg_keys.zip(fake_args.values_at(*arg_keys))] }
 
@@ -92,7 +92,7 @@ RSpec.describe Que::Job do
           priority: nil,
           run_at: nil,
           retryable: true,
-      )
+        )
     end
 
     it "permits setting queue at a class level" do

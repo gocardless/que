@@ -7,7 +7,7 @@ class FakeJob < Que::Job
     attr_accessor :log
   end
 
-  def run(x)
-    self.class.log << x
+  def run(arg)
+    self.class.log << arg
   end
 end

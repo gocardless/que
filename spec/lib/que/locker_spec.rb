@@ -18,10 +18,10 @@ RSpec.describe Que::Locker do
 
     # Helper to call the with_locked_job method but ensure our block has actually been
     # called. Without this, it's possible that we'd never run expectations in our block.
-    def with_locked_job(&block)
+    def with_locked_job
       block_called = false
       locker.with_locked_job do |job|
-        block.call(job)
+        yield(job)
         block_called = true
       end
 
@@ -71,10 +71,10 @@ RSpec.describe Que::Locker do
         expect_to_work(job_1)
 
         expect_to_lock_with(cursor: job_1[:job_id])
-        with_locked_job { }
+        with_locked_job {}
 
         expect_to_lock_with(cursor: 0)
-        with_locked_job { }
+        with_locked_job {}
       end
     end
 
@@ -88,15 +88,13 @@ RSpec.describe Que::Locker do
         expect_to_work(job_1)
       end
 
+      # rubocop:disable RSpec/SubjectStub
+      # rubocop:disable RSpec/InstanceVariable
       context "on subsequent locks" do
         context "with non-zero cursor expiry" do
           let(:cursor_expiry) { 5 }
 
-          before do
-            allow(locker).to receive(:monotonic_now) do
-              @epoch
-            end
-          end
+          before { allow(locker).to receive(:monotonic_now) { @epoch } }
 
           # This test simulates the repeated locking of jobs. We're trying to prove that
           # the locker will use the previous jobs ID as a cursor until the expiry has
@@ -119,6 +117,8 @@ RSpec.describe Que::Locker do
           end
         end
       end
+      # rubocop:enable RSpec/SubjectStub
+      # rubocop:enable RSpec/InstanceVariable
     end
   end
 end

@@ -12,10 +12,10 @@ module Que
     # These are set in the class definition of the Job, as instance variables on the class
     def self.default_attrs
       {
-        job_class: self.to_s,
-        queue:     @queue,
-        priority:  @priority,
-        run_at:    @run_at&.call,
+        job_class: to_s,
+        queue: @queue,
+        priority: @priority,
+        run_at: @run_at&.call,
         retryable: true,
       }
     end
@@ -45,7 +45,7 @@ module Que
       # the keys that might be job options)
       args = [*args, possible_last_arg] if possible_last_arg.any?
 
-      return attrs, args
+      [attrs, args]
     end
 
     def self.run(*args)

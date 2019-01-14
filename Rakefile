@@ -1,3 +1,5 @@
-require 'bundler/gem_tasks'
+# frozen_string_literal: true
 
-Dir["./tasks/*.rb"].sort.each &method(:require)
+require "bundler/gem_tasks"
+
+Dir["./tasks/*.rb"].sort.each { |f| require f }

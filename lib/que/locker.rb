@@ -38,14 +38,14 @@ module Que
       AcquireTotal = Prometheus::Client::Counter.new(
         :que_locker_acquire_total,
         docstring: "Counter of number of job lock queries executed",
-        labels: [:queue, :cursor],
+        labels: %i[queue cursor],
       ),
       AcquireSecondsTotal = Prometheus::Client::Counter.new(
         :que_locker_acquire_seconds_total,
         docstring: "Seconds spent running job lock query",
-        labels: [:queue, :cursor],
+        labels: %i[queue cursor],
       ),
-    ]
+    ].freeze
 
     def initialize(queue:, cursor_expiry:)
       @queue = queue
@@ -58,6 +58,8 @@ module Que
     # calling the given block will cause the worker to immediately retry locking a job-
     # yielding with nil means there were no jobs to lock, and the worker will pause before
     # retrying.
+    # rubocop:disable Metrics/AbcSize
+    # rubocop:disable Metrics/PerceivedComplexity
     def with_locked_job
       reset_cursor if cursor_expired?
 
@@ -100,11 +102,14 @@ module Que
         end
       end
     end
+    # rubocop:enable Metrics/AbcSize
+    # rubocop:enable Metrics/PerceivedComplexity
 
     private
 
     def lock_job
-      observe(AcquireTotal, AcquireSecondsTotal, cursor: @cursor == 0 ? "false" : "true") do
+      cursor = @cursor.zero? ? "false" : "true"
+      observe(AcquireTotal, AcquireSecondsTotal, cursor: cursor) do
         Que.execute(:lock_job, [@queue, @cursor]).first
       end
     end
@@ -124,9 +129,9 @@ module Que
       @cursor_expires_at = monotonic_now + @cursor_expiry
     end
 
-    def observe(metric, metric_duration, labels = {}, &block)
+    def observe(metric, metric_duration, labels = {})
       now = monotonic_now
-      block.call
+      yield
     ensure
       metric.increment(labels: labels.merge(queue: @queue))
       metric_duration.increment(by: monotonic_now - now,

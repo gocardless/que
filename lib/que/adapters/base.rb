@@ -1,17 +1,17 @@
 # frozen_string_literal: true
 
-require 'time' # For Time.parse.
+require "time" # For Time.parse.
 
 module Que
   module Adapters
-    autoload :ActiveRecord,   'que/adapters/active_record'
-    autoload :ConnectionPool, 'que/adapters/connection_pool'
-    autoload :PG,             'que/adapters/pg'
-    autoload :Pond,           'que/adapters/pond'
-    autoload :Sequel,         'que/adapters/sequel'
+    autoload :ActiveRecord,   "que/adapters/active_record"
+    autoload :ConnectionPool, "que/adapters/connection_pool"
+    autoload :PG,             "que/adapters/pg"
+    autoload :Pond,           "que/adapters/pond"
+    autoload :Sequel,         "que/adapters/sequel"
 
     class Base
-      def initialize(thing = nil)
+      def initialize(_thing = nil)
         @prepared_statements = {}
       end
 
@@ -19,14 +19,13 @@ module Que
       # PG::Connection (or something that acts like a PG::Connection) so that
       # no other threads are using it and yield it to the block. Should also
       # be re-entrant.
-      def checkout(&block)
+      def checkout
         raise NotImplementedError
       end
 
       # Called after Que has returned its connection to whatever pool it's
       # using.
-      def cleanup!
-      end
+      def cleanup!; end
 
       # Called after a job is queued in async mode, to prompt a worker to
       # wake up after the current transaction commits. Not all adapters will
@@ -38,17 +37,18 @@ module Que
       def execute(command, params = [])
         params = params.map do |param|
           case param
-            # The pg gem unfortunately doesn't convert fractions of time instances, so cast them to a string.
-            when Time then param.strftime("%Y-%m-%d %H:%M:%S.%6N %z")
-            when Array, Hash then JSON_MODULE.dump(param)
-            else param
+          # The pg gem unfortunately doesn't convert fractions of time instances, so cast
+          # them to a string.
+          when Time then param.strftime("%Y-%m-%d %H:%M:%S.%6N %z")
+          when Array, Hash then JSON_MODULE.dump(param)
+          else param
           end
         end
 
         cast_result \
           case command
-            when Symbol then execute_prepared(command, params)
-            when String then execute_sql(command, params)
+          when Symbol then execute_prepared(command, params)
+          when String then execute_sql(command, params)
           end
       end
 
@@ -67,7 +67,9 @@ module Que
         checkout do |conn|
           # Prepared statement errors have the potential to foul up the entire
           # transaction, so if we're in one, err on the side of safety.
-          return execute_sql(SQL[name], params) if Que.disable_prepared_statements || in_transaction?
+          if Que.disable_prepared_statements || in_transaction?
+            return execute_sql(SQL[name], params)
+          end
 
           statements = @prepared_statements[conn] ||= {}
 
@@ -83,7 +85,7 @@ module Que
             # objects to refer to new backends, so recover as well as we can.
 
             unless prepared_just_now
-              Que.log :level => 'warn', :event => "reprepare_statement", :name => name
+              Que.log level: "warn", event: "reprepare_statement", name: name
               statements[name] = false
               retry
             end
@@ -93,29 +95,31 @@ module Que
         end
       end
 
-      CAST_PROCS = {}
-
-      # Integer, bigint, smallint:
-      CAST_PROCS[23] = CAST_PROCS[20] = CAST_PROCS[21] = proc(&:to_i)
-
-      # Timestamp with time zone.
-      CAST_PROCS[1184] = Time.method(:parse)
-
-      # JSON.
-      CAST_PROCS[114] = -> (value) { JSON_MODULE.load(value, create_additions: false) }
-
-      # Boolean:
-      CAST_PROCS[16] = 't'.method(:==)
+      CAST_PROCS = {
+        # booleans
+        16 => "t".method(:==),
+        # bigint
+        20 => proc(&:to_i),
+        # smallint
+        21 => proc(&:to_i),
+        # integer
+        23 => proc(&:to_i),
+        # json
+        114 => ->(value) { JSON_MODULE.load(value, create_additions: false) },
+        # timestamp with time zone
+        1184 => Time.method(:parse),
+      }.freeze
 
       def cast_result(result)
         output = result.to_a
 
         result.fields.each_with_index do |field, index|
-          if converter = CAST_PROCS[result.ftype(index)]
-            output.each do |hash|
-              unless (value = hash[field]).nil?
-                hash[field] = converter.call(value)
-              end
+          converter = CAST_PROCS[result.ftype(index)]
+          next unless converter
+
+          output.each do |hash|
+            unless (value = hash[field]).nil?
+              hash[field] = converter.call(value)
             end
           end
         end

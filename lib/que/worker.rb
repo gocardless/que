@@ -45,7 +45,7 @@ module Que
         docstring: "Sum of time spent waiting in queue",
         labels: %i[job_class priority queue],
       ),
-    ]
+    ].freeze
 
     # We have metrics of the form "worker running seconds total", where we need to be
     # updating the metrics over the course of a very long-running task. This class is used
@@ -85,9 +85,9 @@ module Que
         end
       end
 
-      def trace(metric, labels = {}, &block)
+      def trace(metric, labels = {})
         start(metric, labels)
-        block.call
+        yield
       ensure
         stop(metric, labels)
       end
@@ -109,8 +109,8 @@ module Que
         collect(matching)
       end
 
-      # We're doing duration arithmetic which should make use of monotonic clocks, to avoid
-      # changes to the system time from affecting our metrics.
+      # We're doing duration arithmetic which should make use of monotonic clocks, to
+      # avoid changes to the system time from affecting our metrics.
       def monotonic_now
         Process.clock_gettime(Process::CLOCK_MONOTONIC)
       end
@@ -126,7 +126,7 @@ module Que
       @locker = Locker.new(queue: queue, cursor_expiry: lock_cursor_expiry)
       @tracer = LongRunningMetricTracer.new(self)
       @stop = false # instruct worker to stop
-      @stopped =  false # mark worker as having stopped
+      @stopped = false # mark worker as having stopped
     end
 
     attr_reader :metrics
@@ -151,6 +151,8 @@ module Que
       @stopped = true
     end
 
+    # rubocop:disable Metrics/MethodLength
+    # rubocop:disable Metrics/AbcSize
     def work
       Que.adapter.checkout do
         @locker.with_locked_job do |job|
@@ -166,7 +168,7 @@ module Que
           }
 
           labels = {
-            job_class: job["job_class"], priority: job["priority"], queue: job["queue"],
+            job_class: job["job_class"], priority: job["priority"], queue: job["queue"]
           }
 
           begin
@@ -223,6 +225,8 @@ module Que
       # the work loop. Instead, we should let the work loop sleep and retry.
       :postgres_error
     end
+    # rubocop:enable Metrics/MethodLength
+    # rubocop:enable Metrics/AbcSize
 
     def stop!
       @stop = true
@@ -245,9 +249,9 @@ module Que
       Que.execute(
         :set_error, [
           count,
-          count ** 4 + 3, # exponentially back off when retrying failures
+          count**4 + 3, # exponentially back off when retrying failures
           "#{error.message}\n#{error.backtrace.join("\n")}",
-          *job.values_at(*Job::JOB_INSTANCE_FIELDS)
+          *job.values_at(*Job::JOB_INSTANCE_FIELDS),
         ]
       )
     end

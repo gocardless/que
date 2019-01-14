@@ -15,15 +15,16 @@
 # like it should). This task only explicitly tests Sequel, but the behavior
 # for ActiveRecord is very similar.
 
+# rubocop:disable Style/GlobalVars
 task :safe_shutdown do
-  require 'sequel'
-  require 'que'
+  require "sequel"
+  require "que"
 
-  url = ENV['DATABASE_URL'] || 'postgres://postgres:@localhost/que-test'
+  url = ENV["DATABASE_URL"] || "postgres://postgres:@localhost/que-test"
   DB = Sequel.connect(url)
 
   if DB.table_exists?(:que_jobs)
-    puts "Uh-oh! Previous shutdown wasn't clean!" if DB[:que_jobs].where(:job_id => 0).count > 0
+    puts "Uh-oh! Previous shutdown wasn't clean!" if DB[:que_jobs].where(job_id: 0).exists
     DB.drop_table :que_jobs
   end
 
@@ -35,7 +36,7 @@ task :safe_shutdown do
   class SafeJob < Que::Job
     def run
       DB.transaction do
-        DB[:que_jobs].insert(:job_id => 0, :job_class => 'Que::Job')
+        DB[:que_jobs].insert(job_id: 0, job_class: "Que::Job")
         $queue.push nil
         sleep
       end
@@ -47,12 +48,12 @@ task :safe_shutdown do
   $queue.pop
 
   puts "From a different terminal window, run one of the following:"
-  %w(SIGINT SIGTERM SIGKILL).each do |signal|
+  %w[SIGINT SIGTERM SIGKILL].each do |signal|
     puts "kill -#{signal} #{Process.pid}"
   end
 
   stop = false
-  trap('INT'){stop = true}
+  trap("INT") { stop = true }
 
   at_exit do
     $stdout.puts "Finishing Que's current jobs before exiting..."
@@ -65,3 +66,4 @@ task :safe_shutdown do
     break if stop
   end
 end
+# rubocop:enable Style/GlobalVars

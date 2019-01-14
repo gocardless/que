@@ -1,8 +1,10 @@
-$LOAD_PATH << File.expand_path(__FILE__, '../lib')
+# frozen_string_literal: true
 
-require 'que'
-require 'rspec'
-require 'active_record'
+$LOAD_PATH << File.expand_path(__FILE__, "../lib")
+
+require "que"
+require "rspec"
+require "active_record"
 
 require_relative "./helpers/create_user"
 require_relative "./helpers/exceptional_job"
@@ -18,11 +20,11 @@ end
 
 def establish_database_connection
   ActiveRecord::Base.establish_connection(
-    adapter: 'postgresql',
-    host: ENV.fetch('PGHOST', 'localhost'),
-    user: ENV.fetch('PGUSER', 'postgres'),
-    password: ENV.fetch('PGPASSWORD', ''),
-    database: ENV.fetch('PGDATABASE', 'que-test')
+    adapter: "postgresql",
+    host: ENV.fetch("PGHOST", "localhost"),
+    user: ENV.fetch("PGUSER", "postgres"),
+    password: ENV.fetch("PGPASSWORD", ""),
+    database: ENV.fetch("PGDATABASE", "que-test"),
   )
 end
 
@@ -36,7 +38,7 @@ Que.migrate!
 Que.logger = Logger.new("/dev/null")
 
 RSpec.configure do |config|
-  config.before(:each) do
+  config.before do
     QueJob.delete_all
     FakeJob.log = []
     ExceptionalJob.log = []
