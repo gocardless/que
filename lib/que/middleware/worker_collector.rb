@@ -28,8 +28,10 @@ module Que
 
       # rubocop:disable Lint/HandleExceptions
       def register(*metrics)
-        metrics.each do |metric|
-          @registry.register(metric)
+        begin
+          metrics.each do |metric|
+            @registry.register(metric)
+          end
         rescue Prometheus::Client::Registry::AlreadyRegisteredError
         end
       end
