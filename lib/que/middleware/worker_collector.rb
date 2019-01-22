@@ -27,12 +27,16 @@ module Que
       private
 
       # rubocop:disable Lint/HandleExceptions
+      # rubocop:disable Style/RedundantBegin
       def register(*metrics)
-        metrics.each do |metric|
-          @registry.register(metric)
+        begin
+          metrics.each do |metric|
+            @registry.register(metric)
+          end
         rescue Prometheus::Client::Registry::AlreadyRegisteredError
         end
       end
+      # rubocop:enable Style/RedundantBegin
       # rubocop:enable Lint/HandleExceptions
     end
   end

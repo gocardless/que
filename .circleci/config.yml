@@ -4,7 +4,7 @@ jobs:
   build:
     working_directory: ~/que
     docker:
-      - image: ruby:2.5.0
+      - image: ruby:2.4.2
         environment:
           PGDATABASE: que-test
           PGUSER: ubuntu
