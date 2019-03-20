@@ -3,6 +3,7 @@
 # Prefactor: SQL hash was previously frozen, but we want to extend it and add some
 # queries that our strategies will use.
 module Que
+  # rubocop:disable Style/MutableConstant
   SQL = {
     # Locks a job using a Postgres recursive CTE [1].
     #
@@ -161,5 +162,6 @@ module Que
         WHERE locktype = 'advisory'
       ) pg USING (job_id)
     },
-  }.freeze
+  }
+  # rubocop:enable Style/MutableConstant
 end
