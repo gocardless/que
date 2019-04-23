@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "prometheus/client"
+require "prometheus_gcstat"
 
 module Que
   module Middleware
@@ -14,6 +15,8 @@ module Que
         @app = app
         @worker_group = options.fetch(:worker_group)
         @registry = options.fetch(:registry, Prometheus::Client.registry)
+        @memstats = Prometheus::MemoryStats.new(Prometheus::Client.registry, interval: 10)
+        @memstats.start
 
         register(*Worker::METRICS)
         register(*Locker::METRICS)

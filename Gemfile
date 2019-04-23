@@ -29,5 +29,8 @@ end
 gem 'prometheus-client',
     git: 'https://github.com/gocardless/prometheus_client_ruby.git',
     branch: 'gc_production_branch_do_not_push'
+gem "prometheus_gcstat",
+    branch: "memstats",
+    git: "git@github.com:gocardless/prometheus_gcstat_ruby"
 
 gemspec
