@@ -31,7 +31,19 @@ module Que
 
       job = new(inserted_job)
       # TODO: _run -> run_and_destroy(*inserted_job[:args])
-      job._run if Que.mode == :sync
+      if Que.mode == :sync
+        job._run
+      else
+        # We only want to log this if we're working the job async, as synchronous work
+        # won't log the subsequent job_begin, job_worked events.
+        Que.logger&.info(
+          event: "que_job.job_enqueued",
+          msg: "Job enqueued",
+          que_job_id: job.attrs["job_id"],
+          args: job.attrs["args"],
+          **job.attrs.symbolize_keys.slice(*JOB_OPTIONS),
+        )
+      end
       job
     end
 
