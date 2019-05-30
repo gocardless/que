@@ -176,6 +176,7 @@ module Que
               log_keys.merge(
                 event: "que_job.job_begin",
                 msg: "Job acquired, beginning work",
+                latency_seconds: job["latency"],
               )
             )
 

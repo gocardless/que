@@ -18,6 +18,22 @@ RSpec.describe Que::Job do
       expect(job.args).to eql(["hello"])
     end
 
+    it "logs" do
+      expect(Que.logger).to receive(:info).with(
+        event: "que_job.job_enqueued",
+        msg: "Job enqueued",
+        que_job_id: an_instance_of(Integer),
+        queue: "default",
+        priority: 100,
+        job_class: "Que::Job",
+        retryable: false,
+        run_at: run_at,
+        args: ["hello"],
+      )
+
+      described_class.enqueue(:hello, run_at: run_at)
+    end
+
     context "with no args" do
       it "adds job to que_jobs table, setting a run_at of the current time" do
         expect { described_class.enqueue }.
