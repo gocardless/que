@@ -11,6 +11,7 @@ require_relative "./helpers/exceptional_job"
 require_relative "./helpers/fake_job"
 require_relative "./helpers/que_job"
 require_relative "./helpers/sleep_job"
+require_relative "./helpers/interruptible_sleep_job"
 require_relative "./helpers/user"
 
 def postgres_now
