@@ -114,6 +114,10 @@ if options.metrics_port
     )
 
     health_check = ->(_) { [200, {}, ["healthy"]] }
+
+    Prometheus::MemoryStats.
+      new(Prometheus::Client.registry).start(interval: 10.seconds, delay: 10.seconds)
+
     app = Rack::URLMap.new(
       "/" => Rack::Builder.new do
         use Que::Middleware::WorkerCollector, worker_group: worker_group
