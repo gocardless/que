@@ -70,9 +70,18 @@ module Que
     # have been passed in.
     def initialize(attrs)
       @attrs = attrs
+      @stop = false
     end
 
     attr_reader :attrs
+
+    def stop!
+      @stop = true
+    end
+
+    def stop?
+      @stop
+    end
 
     def run(*args)
       # In future, we want to raise NotImplementedError here to force subclasses to define

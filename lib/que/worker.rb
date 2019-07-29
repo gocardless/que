@@ -127,6 +127,7 @@ module Que
       @tracer = LongRunningMetricTracer.new(self)
       @stop = false # instruct worker to stop
       @stopped = false # mark worker as having stopped
+      @current_running_job = nil
     end
 
     attr_reader :metrics
@@ -190,7 +191,16 @@ module Que
 
             duration = Benchmark.measure do
               # TODO: _run -> run_and_destroy(*job[:args])
-              @tracer.trace(JobWorkedSecondsTotal, labels) { klass.new(job)._run }
+              @tracer.trace(JobWorkedSecondsTotal, labels) do
+                klass.new(job).tap do |job_instance|
+                  @current_running_job = job_instance
+                  begin
+                    job_instance._run
+                  ensure
+                    @current_running_job = nil
+                  end
+                end
+              end
             end.real
 
             Que.logger&.info(
@@ -231,6 +241,7 @@ module Que
 
     def stop!
       @stop = true
+      @current_running_job&.stop!
     end
 
     def stopped?

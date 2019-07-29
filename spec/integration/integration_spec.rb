@@ -83,5 +83,19 @@ RSpec.describe "multiple workers" do
       expect(sleep_job).to_not be(nil)
       expect(sleep_job.last_error).to match(/Job exceeded timeout when requested to stop/)
     end
+
+    context "but is interruptible" do
+      it "terminates gracefully" do
+        # Sleep for 0.2s before checking if it should continue
+        InterruptibleSleepJob.enqueue(0.2)
+
+        # Sleep 0.1s to let the worker pick-up the SleepJob, then stop the worker with a
+        # a long enough timeout to let an iteration of sleep complete.
+        with_workers(1, stop_timeout: 0.3) { sleep 0.1 }
+
+        expect(QueJob.count).to eq(0)
+        expect(InterruptibleSleepJob.log.count).to eq(1)
+      end
+    end
   end
 end
