@@ -30,7 +30,7 @@ RSpec.describe Que::Worker do
                  priority: 100,
                  queue: "default",
                  que_job_id: job.attrs["job_id"],
-                 latency_seconds: an_instance_of(Float),
+                 latency: an_instance_of(Float),
                ))
 
         expect(Que.logger).to receive(:info).
