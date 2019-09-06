@@ -53,21 +53,27 @@ module Que
         # report metric values that are current in every scrape.
         Queued.values.each { |labels, _| Queued.set(0.0, labels: labels) }
 
-        # Now we can safely update our gauges, touching only those that exist in our queue
-        Que.execute(QUEUE_VIEW_SQL).each do |labels|
-          Queued.set(
-            labels["count"],
-            labels: {
-              queue: labels["queue"],
-              job_class: labels["job_class"],
-              priority: labels["priority"],
-              due: labels["due"],
-            },
-          )
-        end
+        Que.transaction do
+          # Ensure metric queries never take more than 500ms to execute, preventing our
+          # metric collector from hurting the database when it's already under pressure.
+          Que.execute("set local statement_timeout='500ms';")
 
-        # DeadTuples has no labels, we can expect this to be a single numeric value
-        DeadTuples.set(Que.execute(DEAD_TUPLES_SQL).first&.fetch("n_dead_tup"))
+          # Now we can safely update our gauges, touching only those that exist in our queue
+          Que.execute(QUEUE_VIEW_SQL).each do |labels|
+            Queued.set(
+              labels["count"],
+              labels: {
+                queue: labels["queue"],
+                job_class: labels["job_class"],
+                priority: labels["priority"],
+                due: labels["due"],
+              },
+            )
+          end
+
+          # DeadTuples has no labels, we can expect this to be a single numeric value
+          DeadTuples.set(Que.execute(DEAD_TUPLES_SQL).first&.fetch("n_dead_tup"))
+        end
 
         @app.call(env)
       end
