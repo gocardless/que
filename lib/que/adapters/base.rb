@@ -107,7 +107,13 @@ module Que
         # json
         114 => ->(value) { JSON_MODULE.load(value, create_additions: false) },
         # timestamp with time zone
-        1184 => Time.method(:parse),
+        1184 => ->(value) {
+          case value
+          when Time then value
+          when String then Time.parse(value)
+          else raise "Unexpected time class: #{value.class} (#{value.inspect})"
+          end
+        },
       }.freeze
 
       def cast_result(result)
