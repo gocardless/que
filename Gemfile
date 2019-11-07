@@ -26,7 +26,7 @@ platforms :rbx do
   gem 'rubysl', '~> 2.0'
 end
 
-gem 'prometheus-client', '~> 0.10.0.alpha'
+gem 'prometheus-client', '~> 1.0'
 gem 'prometheus_gcstat', git: 'git@github.com:gocardless/prometheus_gcstat_ruby'
 
 gemspec
