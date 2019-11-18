@@ -20,6 +20,16 @@ module Que
       }
     end
 
+    # Allow overriding of the default adapter when creating jobs. This enables people with
+    # Que jobs from various database connections to coexist in the same project.
+    def self.use_adapter(adapter)
+      @adapter = adapter
+    end
+
+    def self.adapter
+      @adapter || Que.adapter
+    end
+
     def self.enqueue(*args, **kwargs)
       attrs, args = extract_attrs_and_args(*args, **kwargs)
 
@@ -27,7 +37,7 @@ module Que
       # been inserted into the DB. In future, we might wish to change this, but for now
       # we'll keep it for compatibility.
       inserted_job =
-        Que.execute(:insert_job, [*attrs.values_at(*JOB_OPTIONS), args]).first
+        adapter.execute(:insert_job, [*attrs.values_at(*JOB_OPTIONS), args]).first
 
       job = new(inserted_job)
       # TODO: _run -> run_and_destroy(*inserted_job[:args])
@@ -105,7 +115,8 @@ module Que
     end
 
     def destroy
-      Que.execute(:destroy_job, @attrs.values_at(:queue, :priority, :run_at, :job_id))
+      self.class.adapter.
+        execute(:destroy_job, @attrs.values_at(:queue, :priority, :run_at, :job_id))
     end
   end
 end
