@@ -34,6 +34,19 @@ RSpec.describe Que::Job do
       described_class.enqueue(:hello, run_at: run_at)
     end
 
+    context "with a custom adapter specified" do
+      let(:custom_adapter) { Que.adapter.dup }
+      let(:job_with_adapter) { Class.new(described_class) }
+
+      before { job_with_adapter.use_adapter(custom_adapter) }
+
+      it "uses the custom adapter" do
+        expect(custom_adapter).to receive(:execute).and_call_original
+
+        job_with_adapter.enqueue(:hello, run_at: run_at)
+      end
+    end
+
     context "with no args" do
       it "adds job to que_jobs table, setting a run_at of the current time" do
         expect { described_class.enqueue }.
@@ -91,11 +104,44 @@ RSpec.describe Que::Job do
     end
   end
 
+  describe ".adapter" do
+    context "with an adapter specified" do
+      let(:custom_adapter) { double(Que::Adapters::Base) }
+      let(:job_with_adapter) { Class.new(described_class) }
+
+      it "uses the correct adapter" do
+        expect(described_class.adapter).to eq(Que.adapter)
+
+        job_with_adapter.use_adapter(custom_adapter)
+
+        expect(job_with_adapter.adapter).to eq(custom_adapter)
+      end
+    end
+  end
+
   describe ".run" do
     it "news up a job and runs it" do
       FakeJob.run(1)
 
       expect(FakeJob.log).to eq([1])
+    end
+  end
+
+  describe ".destroy" do
+    context "with a custom adapter specified" do
+      let(:run_at) { postgres_now }
+      let(:custom_adapter) { Que.adapter.dup }
+      let(:job_with_adapter) { Class.new(described_class) }
+
+      before { job_with_adapter.use_adapter(custom_adapter) }
+
+      it "uses the custom adapter" do
+        job = job_with_adapter.enqueue(:hello, run_at: run_at)
+
+        expect(custom_adapter).to receive(:execute).and_call_original
+
+        job.destroy
+      end
     end
   end
 
