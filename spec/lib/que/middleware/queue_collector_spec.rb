@@ -18,6 +18,12 @@ RSpec.describe Que::Middleware::QueueCollector do
     FakeJob.enqueue(run_at: due_now, priority: 1, retryable: false)
     FakeJob.enqueue(run_at: pending_now, priority: 1) # not due
 
+    # Fail a job in the same way it would be failed if the worker had run it
+    job_to_fail = FakeJob.enqueue(run_at: due_now, priority: 20, retryable: false)
+    error = StandardError.new("bang")
+    error.set_backtrace(caller)
+    Que::Worker.new.send(:handle_job_failure, error, job_to_fail.attrs)
+
     # not due, different queue
     FakeJob.enqueue(run_at: pending_now, queue: "another", priority: 1)
   end
@@ -27,10 +33,16 @@ RSpec.describe Que::Middleware::QueueCollector do
       collector.call({})
 
       expect(described_class::Queued.values).to eql(
-        { queue: "default", job_class: "FakeJob", priority: "1", due: "true" } => 2.0,
-        { queue: "default", job_class: "FakeJob", priority: "10", due: "true" } => 1.0,
-        { queue: "default", job_class: "FakeJob", priority: "1", due: "false" } => 2.0,
-        { queue: "another", job_class: "FakeJob", priority: "1", due: "false" } => 1.0,
+        { queue: "default", job_class: "FakeJob", priority: "1",
+          due: "true", failed:  "false" } => 2.0,
+        { queue: "default", job_class: "FakeJob", priority: "10",
+          due: "true", failed:  "false" } => 1.0,
+        { queue: "default", job_class: "FakeJob", priority: "1",
+          due: "false", failed:  "false" } => 2.0,
+        { queue: "another", job_class: "FakeJob", priority: "1",
+          due: "false", failed:  "false" } => 1.0,
+        { queue: "default", job_class: "FakeJob", priority: "20",
+          due: "false", failed:  "true" } => 1.0,
       )
 
       # It's not easy to predict the number of dead tuples deterministically, so we just
