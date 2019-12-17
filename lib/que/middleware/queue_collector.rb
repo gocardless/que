@@ -10,20 +10,20 @@ module Que
     class QueueCollector
       Queued = Prometheus::Client::Gauge.new(
         :que_queue_queued,
-        docstring: "Number of jobs in the queue, by job_class/priority/due",
-        labels: %i[queue job_class priority due],
+        docstring: "Number of jobs in the queue, by job_class/priority/due/failed",
+        labels: %i[queue job_class priority due failed],
       )
       DeadTuples = Prometheus::Client::Gauge.new(
         :que_dead_tuples,
         docstring: "Number of dead tuples in the que_jobs table",
       )
-
       QUEUE_VIEW_SQL = <<~SQL
         select queue, job_class, priority
              , (case when (retryable AND run_at < now()) then 'true' else 'false' end) as due
+             , (case when (NOT retryable AND error_count > 0) then 'true' else 'false' end) as failed
              , count(*)
-          from que_jobs
-         group by 1, 2, 3, 4;
+             from que_jobs
+         group by 1, 2, 3, 4, 5;
       SQL
 
       DEAD_TUPLES_SQL = <<~SQL
@@ -58,7 +58,8 @@ module Que
           # metric collector from hurting the database when it's already under pressure.
           Que.execute("set local statement_timeout='500ms';")
 
-          # Now we can safely update our gauges, touching only those that exist in our queue
+          # Now we can safely update our gauges, touching only those that exist
+          # in our queue
           Que.execute(QUEUE_VIEW_SQL).each do |labels|
             Queued.set(
               labels["count"],
@@ -67,6 +68,7 @@ module Que
                 job_class: labels["job_class"],
                 priority: labels["priority"],
                 due: labels["due"],
+                failed: labels["failed"],
               },
             )
           end
