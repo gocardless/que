@@ -15,8 +15,7 @@ require_relative "./helpers/interruptible_sleep_job"
 require_relative "./helpers/user"
 
 def postgres_now
-  now = ActiveRecord::Base.connection.execute("SELECT NOW();")[0]["now"]
-  Time.parse(now)
+  ActiveRecord::Base.connection.execute("SELECT NOW();")[0]["now"]
 end
 
 def establish_database_connection

@@ -18,7 +18,7 @@ end
 group :test do
   gem 'pry'
   gem 'pry-byebug'
-  gem 'rspec', '~> 2.14.1'
+  gem 'rspec', '~> 3.9'
 end
 
 platforms :rbx do

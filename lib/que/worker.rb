@@ -119,15 +119,22 @@ module Que
     def initialize(
       queue: DEFAULT_QUEUE,
       wake_interval: DEFAULT_WAKE_INTERVAL,
-      lock_cursor_expiry: DEFAULT_LOCK_CURSOR_EXPIRY
+      lock_cursor_expiry: DEFAULT_LOCK_CURSOR_EXPIRY,
+      lock_window: nil,
+      lock_budget: nil
     )
       @queue = queue
       @wake_interval = wake_interval
-      @locker = Locker.new(queue: queue, cursor_expiry: lock_cursor_expiry)
       @tracer = LongRunningMetricTracer.new(self)
       @stop = false # instruct worker to stop
       @stopped = false # mark worker as having stopped
       @current_running_job = nil
+      @locker = Locker.new(
+        queue: queue,
+        cursor_expiry: lock_cursor_expiry,
+        window: lock_window,
+        budget: lock_budget,
+      )
     end
 
     attr_reader :metrics
