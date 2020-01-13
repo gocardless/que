@@ -38,12 +38,12 @@ module Que
       AcquireTotal = Prometheus::Client::Counter.new(
         :que_locker_acquire_total,
         docstring: "Counter of number of job lock queries executed",
-        labels: %i[queue cursor],
+        labels: %i[queue strategy],
       ),
       AcquireSecondsTotal = Prometheus::Client::Counter.new(
         :que_locker_acquire_seconds_total,
         docstring: "Seconds spent running job lock query",
-        labels: %i[queue cursor],
+        labels: %i[queue strategy],
       ),
     ].freeze
 
@@ -108,8 +108,8 @@ module Que
     private
 
     def lock_job
-      cursor = @cursor.zero? ? "false" : "true"
-      observe(AcquireTotal, AcquireSecondsTotal, cursor: cursor) do
+      strategy = @cursor.zero? ? "full" : "cursor"
+      observe(AcquireTotal, AcquireSecondsTotal, strategy: strategy) do
         Que.execute(:lock_job, [@queue, @cursor]).first
       end
     end
