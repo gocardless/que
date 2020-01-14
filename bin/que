@@ -30,6 +30,14 @@ OptionParser.new do |opts|
     options.cursor_expiry = cursor_expiry
   end
 
+  opts.on("--lock-window [WINDOW]", Float, "Duration (seconds) over which job lockers apply their budget") do |lock_window|
+    options.lock_window = lock_window
+  end
+
+  opts.on("--lock-budget [BUDGET]", Float, "Max duration (seconds) worker should spend locking jobs in --lock-window") do |lock_budget|
+    options.lock_budget = lock_budget
+  end
+
   opts.on("-c", "--worker-count [COUNT]", Integer, "Start this many threaded workers") do |worker_count|
     options.worker_count = worker_count
   end
@@ -94,7 +102,6 @@ end
 
 queue_name     = options.queue_name     || ENV["QUE_QUEUE"] || Que::Worker::DEFAULT_QUEUE
 wake_interval  = options.wake_interval  || ENV["QUE_WAKE_INTERVAL"]&.to_f
-cursor_expiry  = options.cursor_expiry  || 0
 worker_count   = options.worker_count   || 1
 timeout        = options.timeout
 
@@ -102,7 +109,9 @@ worker_group = Que::WorkerGroup.start(
   worker_count,
   queue: queue_name,
   wake_interval: wake_interval,
-  lock_cursor_expiry: cursor_expiry,
+  lock_cursor_expiry: options.cursor_expiry,
+  lock_window: options.lock_window,
+  lock_budget: options.lock_budget,
 )
 
 if options.metrics_port

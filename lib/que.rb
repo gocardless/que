@@ -5,6 +5,7 @@ require "socket" # For hostname
 require_relative "que/adapters/base"
 require_relative "que/job"
 require_relative "que/job_timeout_error"
+require_relative "que/leaky_bucket"
 require_relative "que/locker"
 require_relative "que/migrations"
 require_relative "que/sql"

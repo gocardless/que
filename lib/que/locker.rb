@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "prometheus/client"
+require_relative "leaky_bucket"
 
 module Que
   # The Locker is used to acquire a job from the Postgres jobs table. The only method we
@@ -35,23 +36,32 @@ module Que
         docstring: "Seconds spent unlocking job advisory locks",
         labels: [:queue],
       ),
+      ThrottleSecondsTotal = Prometheus::Client::Counter.new(
+        :que_locker_throttle_seconds_total,
+        docstring: "Seconds spent throttling calls to lock jobs",
+        labels: [:queue],
+      ),
       AcquireTotal = Prometheus::Client::Counter.new(
         :que_locker_acquire_total,
         docstring: "Counter of number of job lock queries executed",
-        labels: %i[queue cursor],
+        labels: %i[queue strategy],
       ),
       AcquireSecondsTotal = Prometheus::Client::Counter.new(
         :que_locker_acquire_seconds_total,
         docstring: "Seconds spent running job lock query",
-        labels: %i[queue cursor],
+        labels: %i[queue strategy],
       ),
     ].freeze
 
-    def initialize(queue:, cursor_expiry:)
+    def initialize(queue:, cursor_expiry:, window: nil, budget: nil)
       @queue = queue
       @cursor_expiry = cursor_expiry
       @cursor = 0
       @cursor_expires_at = monotonic_now
+
+      if window && budget
+        @leaky_bucket = LeakyBucket.new(window: window, budget: budget)
+      end
     end
 
     # Acquire a job for the period of running the given block. Returning nil without
@@ -108,8 +118,12 @@ module Que
     private
 
     def lock_job
-      cursor = @cursor.zero? ? "false" : "true"
-      observe(AcquireTotal, AcquireSecondsTotal, cursor: cursor) do
+      observe(nil, ThrottleSecondsTotal) do
+        @leaky_bucket.refill if @leaky_bucket
+      end
+
+      strategy = @cursor.zero? ? "full" : "cursor"
+      observe(AcquireTotal, AcquireSecondsTotal, strategy: strategy) do
         Que.execute(:lock_job, [@queue, @cursor]).first
       end
     end
@@ -133,9 +147,13 @@ module Que
       now = monotonic_now
       yield
     ensure
-      metric.increment(labels: labels.merge(queue: @queue))
-      metric_duration.increment(by: monotonic_now - now,
-                                labels: labels.merge(queue: @queue))
+      metric.increment(labels: labels.merge(queue: @queue)) if metric
+      if metric_duration
+        metric_duration.increment(
+          by: monotonic_now - now,
+          labels: labels.merge(queue: @queue)
+        )
+      end
     end
 
     def monotonic_now
