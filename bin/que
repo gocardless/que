@@ -18,7 +18,7 @@ options = OpenStruct.new
 OptionParser.new do |opts|
   opts.banner = "usage: que [options] file/to/require ..."
 
-  opts.on("-i", "--wake-interval [INTERVAL]", Float, "Set maximum interval between polls of the job queue (in seconds) (default: 0.1)") do |wake_interval|
+  opts.on("-i", "--wake-interval [INTERVAL]", Float, "Set maximum interval between polls of the job queue (in seconds) (default: 5.0)") do |wake_interval|
     options.wake_interval = wake_interval
   end
 
@@ -26,15 +26,15 @@ OptionParser.new do |opts|
     options.metrics_port = metrics_port
   end
 
-  opts.on("-e", "--cursor-expiry [EXPIRY]", Integer, "Enable performance patch with cached cursors") do |cursor_expiry|
+  opts.on("-e", "--cursor-expiry [EXPIRY]", Float, "Enable caching of cursors for a duration (in seconds) for improved performance (default: 5.0)") do |cursor_expiry|
     options.cursor_expiry = cursor_expiry
   end
 
-  opts.on("--lock-window [WINDOW]", Float, "Duration (seconds) over which job lockers apply their budget") do |lock_window|
+  opts.on("--lock-window [WINDOW]", Float, "Duration (in seconds) over which job lockers apply their budget") do |lock_window|
     options.lock_window = lock_window
   end
 
-  opts.on("--lock-budget [BUDGET]", Float, "Max duration (seconds) worker should spend locking jobs in --lock-window") do |lock_budget|
+  opts.on("--lock-budget [BUDGET]", Float, "Max duration (in seconds) worker should spend locking jobs in --lock-window") do |lock_budget|
     options.lock_budget = lock_budget
   end
 
@@ -46,11 +46,11 @@ OptionParser.new do |opts|
     options.log_level = log_level
   end
 
-  opts.on("-q", "--queue-name [NAME]", String, "Set the name of the queue to work jobs from (default: the default queue)") do |queue_name|
+  opts.on("-q", "--queue-name [NAME]", String, "Set the name of the queue to work jobs from (default: default)") do |queue_name|
     options.queue_name = queue_name
   end
 
-  opts.on("--timeout [TIMEOUT]", Integer, "Set the amount of time (in seconds) to wait, after receiving SIGTERM/SIGINT, for workers to finish before forcing them to stop") do |timeout|
+  opts.on("--timeout [TIMEOUT]", Float, "Set the duration (in seconds) to wait, after receiving SIGTERM/SIGINT, for workers to finish before forcing them to stop") do |timeout|
     options.timeout = timeout
   end
 
@@ -83,10 +83,16 @@ rescue LoadError
   $stdout.puts "Could not load file '#{file}'"
 end
 
+log_level      = options.log_level     || ENV["QUE_LOG_LEVEL"]           || "info"
+queue_name     = options.queue_name    || ENV["QUE_QUEUE"]               || Que::Worker::DEFAULT_QUEUE
+wake_interval  = options.wake_interval || ENV["QUE_WAKE_INTERVAL"]&.to_f || Que::Worker::DEFAULT_WAKE_INTERVAL
+cursor_expiry  = options.cursor_expiry || wake_interval
+worker_count   = options.worker_count  || 1
+timeout        = options.timeout
+
 Que.logger ||= Logger.new(STDOUT)
 
 begin
-  log_level = (options.log_level || ENV["QUE_LOG_LEVEL"])
   Que.logger.level = Logger.const_get(log_level.upcase) if log_level
 rescue NameError
   $stdout.puts "Bad logging level: #{log_level}"
@@ -100,16 +106,11 @@ def wait_for_signals(*signals, sleep_interval: 1)
   sleep(sleep_interval) until received_signal
 end
 
-queue_name     = options.queue_name     || ENV["QUE_QUEUE"] || Que::Worker::DEFAULT_QUEUE
-wake_interval  = options.wake_interval  || ENV["QUE_WAKE_INTERVAL"]&.to_f
-worker_count   = options.worker_count   || 1
-timeout        = options.timeout
-
 worker_group = Que::WorkerGroup.start(
   worker_count,
   queue: queue_name,
   wake_interval: wake_interval,
-  lock_cursor_expiry: options.cursor_expiry,
+  lock_cursor_expiry: cursor_expiry,
   lock_window: options.lock_window,
   lock_budget: options.lock_budget,
 )

@@ -11,8 +11,7 @@ module Que
   class Worker
     # Defines the time a worker will wait before checking Postgres for its next job
     DEFAULT_QUEUE = "default"
-    DEFAULT_WAKE_INTERVAL = 5
-    DEFAULT_LOCK_CURSOR_EXPIRY = 0 # seconds
+    DEFAULT_WAKE_INTERVAL = 5.0 # seconds
 
     METRICS = [
       RunningSecondsTotal = Prometheus::Client::Counter.new(
@@ -119,7 +118,7 @@ module Que
     def initialize(
       queue: DEFAULT_QUEUE,
       wake_interval: DEFAULT_WAKE_INTERVAL,
-      lock_cursor_expiry: DEFAULT_LOCK_CURSOR_EXPIRY,
+      lock_cursor_expiry: DEFAULT_WAKE_INTERVAL,
       lock_window: nil,
       lock_budget: nil
     )
