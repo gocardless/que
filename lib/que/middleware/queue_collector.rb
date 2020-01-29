@@ -13,28 +13,11 @@ module Que
         docstring: "Number of jobs in the queue, by job_class/priority/due/failed",
         labels: %i[queue job_class priority due failed],
       )
-      DeadTuples = Prometheus::Client::Gauge.new(
-        :que_dead_tuples,
-        docstring: "Number of dead tuples in the que_jobs table",
-      )
-      QUEUE_VIEW_SQL = <<~SQL
-        select queue, job_class, priority
-             , (case when (retryable AND run_at < now()) then 'true' else 'false' end) as due
-             , (case when (NOT retryable AND error_count > 0) then 'true' else 'false' end) as failed
-             , count(*)
-             from que_jobs
-         group by 1, 2, 3, 4, 5;
-      SQL
-
-      DEAD_TUPLES_SQL = <<~SQL
-        select n_dead_tup
-          from pg_stat_user_tables
-         where relname='que_jobs';
-      SQL
 
       def initialize(app, options = {})
         @app = app
         @registry = options.fetch(:registry, Prometheus::Client.registry)
+        @refresh_interval = options.fetch(:refresh_interval, 20.seconds)
         begin
           @registry.register(Queued)
         rescue StandardError
@@ -53,33 +36,53 @@ module Que
         # report metric values that are current in every scrape.
         Queued.values.each { |labels, _| Queued.set(0.0, labels: labels) }
 
-        Que.transaction do
-          # Ensure metric queries never take more than 500ms to execute, preventing our
-          # metric collector from hurting the database when it's already under pressure.
-          Que.execute("set local statement_timeout='500ms';")
+        refresh_materialized_view if due_refresh?
 
-          # Now we can safely update our gauges, touching only those that exist
-          # in our queue
-          Que.execute(QUEUE_VIEW_SQL).each do |labels|
-            Queued.set(
-              labels["count"],
-              labels: {
-                queue: labels["queue"],
-                job_class: labels["job_class"],
-                priority: labels["priority"],
-                due: labels["due"],
-                failed: labels["failed"],
-              },
-            )
-          end
-
-          # DeadTuples has no labels, we can expect this to be a single numeric value
-          DeadTuples.set(Que.execute(DEAD_TUPLES_SQL).first&.fetch("n_dead_tup"))
+        # Now we can safely update our gauges, touching only those that exist
+        # in our queue
+        Que.execute("select * from que_jobs_summary").each do |labels|
+          Queued.set(
+            labels["count"],
+            labels: {
+              queue: labels["queue"],
+              job_class: labels["job_class"],
+              priority: labels["priority"],
+              due: labels["due"],
+              failed: labels["failed"],
+            },
+          )
         end
 
         @app.call(env)
       end
       # rubocop:enable Metrics/AbcSize
+
+      def refresh_materialized_view
+        # Ensure generating metrics never take more than 5000ms to execute. If we can't
+        # grab the lock within 100ms, then we know someone else is refreshing the view,
+        # and should quit silently
+        Que.transaction do
+          Que.execute("set local lock_timeout='100ms';")
+          Que.execute("set local statement_timeout='5000ms';")
+          Que.execute("refresh materialized view que_jobs_summary;")
+          Que.execute("analyze que_jobs_summary;")
+        end
+      rescue StandardError => err
+        Que.logger.info(event: "refresh_materialized_view", error: err.to_s)
+      end
+
+      def due_refresh?
+        since_analyze = Que.execute(<<~SQL).first&.fetch("since_analyze")
+          select case
+            when last_analyze is not null then extract(epoch from now() - last_analyze)
+            else null
+          end as since_analyze
+          from pg_stat_user_tables
+          where relname = 'que_jobs_summary';
+        SQL
+
+        since_analyze.nil? || since_analyze > @refresh_interval
+      end
     end
   end
 end

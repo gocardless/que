@@ -5,7 +5,7 @@ module Que
     # In order to ship a schema change, add the relevant up and down sql files
     # to the migrations directory, and bump the version both here and in the
     # add_que generator template.
-    CURRENT_VERSION = 4
+    CURRENT_VERSION = 5
 
     class << self
       # rubocop:disable Metrics/AbcSize
