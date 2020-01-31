@@ -29,11 +29,12 @@ module Que
     # remains in the bucket, and should only be called after the bucket has been refilled.
     def observe
       start = @clock.now
-      value = yield
+      result = yield
+    ensure
       duration = @clock.now - start
       @remaining -= duration
 
-      value
+      result
     end
 
     # Wait for the bucket to be refilled, given the time that has elapsed since the last
@@ -51,6 +52,15 @@ module Que
       if @remaining < 0.0
         @clock.sleep(-@remaining / @ratio)
       end
+    end
+
+    private
+
+    def catch_error(&block)
+      result = block.call
+      [result, nil]
+    rescue StandardError => err
+      [result, err]
     end
   end
 end
