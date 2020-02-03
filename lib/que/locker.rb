@@ -59,9 +59,9 @@ module Que
       @cursor = 0
       @cursor_expires_at = monotonic_now
 
-      if window && budget
-        @leaky_bucket = LeakyBucket.new(window: window, budget: budget)
-      end
+      # Create a bucket that has 100% capacity, so even when we don't apply a limit we
+      # have a valid bucket that we can use everywhere
+      @leaky_bucket = LeakyBucket.new(window: window || 1.0, budget: budget || 1.0)
     end
 
     # Acquire a job for the period of running the given block. Returning nil without
@@ -118,10 +118,11 @@ module Que
     private
 
     def lock_job
-      observe(nil, ThrottleSecondsTotal) do
-        @leaky_bucket.refill if @leaky_bucket
-      end
+      observe(nil, ThrottleSecondsTotal) { @leaky_bucket.refill }
+      @leaky_bucket.observe { execute_lock_job }
+    end
 
+    def execute_lock_job
       strategy = @cursor.zero? ? "full" : "cursor"
       observe(AcquireTotal, AcquireSecondsTotal, strategy: strategy) do
         Que.execute(:lock_job, [@queue, @cursor]).first

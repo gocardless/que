@@ -27,14 +27,19 @@ RSpec.describe Que::LeakyBucket do
     end
   end
 
-  def measure_total_work(clock, bucket, runtime:, work_duration: 0.05)
+  def measure_total_work(clock, bucket, runtime:, work_duration: 0.05, error: false)
     total_work = 0.0
     until clock.now > runtime
       bucket.refill
-      bucket.observe do
-        duration = Random.rand(work_duration)
-        clock.advance(duration)
-        total_work += duration
+      begin
+        bucket.observe do
+          duration = Random.rand(work_duration)
+          clock.advance(duration)
+          total_work += duration
+          raise StandardError, "throwing" if error
+        end
+      rescue StandardError => err
+        fail(err) unless error
       end
     end
 
@@ -43,8 +48,10 @@ RSpec.describe Que::LeakyBucket do
 
   context "when working as much as possible" do
     subject do
-      measure_total_work(clock, bucket, runtime: 10.0)
+      measure_total_work(clock, bucket, runtime: 10.0, error: throw_error)
     end
+
+    let(:throw_error) { false }
 
     context "runtime 10s, window 10s, budget 2s" do
       let(:runtime) { 10.0 }
@@ -52,6 +59,12 @@ RSpec.describe Que::LeakyBucket do
       let(:budget) { 2.0 }
 
       it { is_expected.to be_within(0.2).of(2.0) }
+
+      context "when observed method throws exception" do
+        let(:throw_error) { true }
+
+        it { is_expected.to be_within(0.2).of(2.0) }
+      end
     end
 
     context "runtime 10s, window 5s, budget 4s" do
