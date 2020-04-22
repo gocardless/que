@@ -63,7 +63,13 @@ module Que
       private
 
       def checkout_activerecord_adapter(&block)
-        ::ActiveRecord::Base.connection_pool.with_connection(&block)
+        if defined?(::Rails.application.executor)
+          ::Rails.application.executor.wrap do
+            ::ActiveRecord::Base.connection_pool.with_connection(&block)
+          end
+        else
+          ::ActiveRecord::Base.connection_pool.with_connection(&block)
+        end
       end
     end
   end
