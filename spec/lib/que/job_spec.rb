@@ -26,7 +26,7 @@ RSpec.describe Que::Job do
         queue: "default",
         priority: 100,
         job_class: "Que::Job",
-        retryable: false,
+        retryable: true,
         run_at: run_at,
         args: ["hello"],
       )
