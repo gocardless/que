@@ -106,6 +106,8 @@ module Que
         23 => proc(&:to_i),
         # json
         114 => ->(value) { JSON_MODULE.load(value, create_additions: false) },
+        # float
+        701 => proc(&:to_f),
         # timestamp with time zone
         1184 => ->(value) {
           case value
