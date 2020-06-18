@@ -97,7 +97,12 @@ module Que
 
       CAST_PROCS = {
         # booleans
-        16 => "t".method(:==),
+        16 => ->(value) {
+          case value
+          when String then value == "t"
+          else !!value
+          end
+        },
         # bigint
         20 => proc(&:to_i),
         # smallint
