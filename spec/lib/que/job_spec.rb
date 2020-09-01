@@ -47,6 +47,13 @@ RSpec.describe Que::Job do
       end
     end
 
+    context "with retryable: false" do
+      it "does not override with default (true)" do
+        job = described_class.enqueue(retryable: false)
+        expect(job.attrs["retryable"]).to eq false
+      end
+    end
+
     context "with no args" do
       it "adds job to que_jobs table, setting a run_at of the current time" do
         expect { described_class.enqueue }.
@@ -75,7 +82,7 @@ RSpec.describe Que::Job do
         let(:args) { Hash[arg_keys.zip(fake_args.values_at(*arg_keys))] }
 
         it "handles them properly" do
-          described_class.enqueue(1, true, "foo", { a_real_arg: true }.merge(args))
+          described_class.enqueue(1, true, "foo", { a_real_arg: true }, **args)
           job = QueJob.last
 
           arg_keys.each do |key|

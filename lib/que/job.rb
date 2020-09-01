@@ -30,8 +30,21 @@ module Que
       @adapter || Que.adapter
     end
 
-    def self.enqueue(*args, **kwargs)
-      attrs, args = extract_attrs_and_args(*args, **kwargs)
+    def self.enqueue(
+      *args,
+      job_class: nil,
+      queue: nil,
+      priority: nil,
+      run_at: nil,
+      retryable: nil,
+    )
+      attrs = {
+        job_class: job_class || default_attrs[:job_class],
+        queue:     queue     || default_attrs[:queue],
+        priority:  priority  || default_attrs[:priority],
+        run_at:    run_at    || default_attrs[:run_at],
+        retryable: (retryable.nil? ? default_attrs[:retryable] : retryable),
+      }
 
       # We return an instantiated Job class so that the caller can see the record that's
       # been inserted into the DB. In future, we might wish to change this, but for now
@@ -55,19 +68,6 @@ module Que
         )
       end
       job
-    end
-
-    # This method extracts the given args and attrs from parameters supplied to enqueue,
-    # separating out things like `run_at` and genuine keyword args to a job.
-    def self.extract_attrs_and_args(*args, **kwargs)
-      attrs = default_attrs.merge(kwargs.slice(*JOB_OPTIONS))
-      possible_last_arg = kwargs.without(*JOB_OPTIONS)
-
-      # If the job specifies a Hash as its last argument, make sure we include it (minus
-      # the keys that might be job options)
-      args = [*args, possible_last_arg] if possible_last_arg.any?
-
-      [attrs, args]
     end
 
     def self.run(*args)
