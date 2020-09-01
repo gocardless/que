@@ -4,7 +4,7 @@ jobs:
   build:
     working_directory: ~/que
     docker:
-      - image: ruby:2.6.5
+      - image: ruby:2.7.1
         environment:
           PGDATABASE: que-test
           PGUSER: ubuntu
@@ -18,10 +18,10 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          key: gemfile-265-{{ .Branch }}-{{ checksum "Gemfile" }}
+          key: gemfile-271-{{ .Branch }}-{{ checksum "Gemfile" }}
       - run: bundle install
       - save_cache:
-          key: gemfile-265-{{ .Branch }}-{{ checksum "Gemfile" }}
+          key: gemfile-271-{{ .Branch }}-{{ checksum "Gemfile" }}
           paths:
             - "vendor/bundle"
       - run: bundle exec rspec
