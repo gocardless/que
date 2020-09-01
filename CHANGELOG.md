@@ -7,6 +7,12 @@
 *   Apply label to locker metrics to indicate cursor presence
 *   Pin Prometheus to a GoCardless feature branch [link](https://github.com/gocardless/prometheus_client_ruby/tree/gc_production_branch_do_not_push) that is incompatible with upstream. This version has breaking API changes and includes new features such as pluggable data stores.
 *   Add `failed` label to queue collector middleware
+*   [BREAKING] Add support for keyword arguments. If running Ruby < 3.0 and using hash
+    arguments (e.g. `Job.enqueue(foo: :bar)`, handled by `def run(args = {})`),
+    you will need to append `**{}` as the final argument to `enqueue` to ensure that your
+    hash is not interpreted as keyword arguments, i.e. `Job.enqueue({ foo: :bar }, **{})`
+    (in Ruby 3.0, hash arguments will not be automatically cast as keyword arguments and
+    this will not be an issue).
 
 ### 1.0.0 (2018-07-20)
 

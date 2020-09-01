@@ -8,6 +8,7 @@ module Que
     # These are order dependent, as we use them in prepared statements
     JOB_OPTIONS = %i[queue priority run_at job_class retryable].freeze
     JOB_INSTANCE_FIELDS = %i[queue priority run_at job_id].freeze
+    KWARGS_KEY = "__kwargs"
 
     # These are set in the class definition of the Job, as instance variables on the class
     def self.default_attrs
@@ -37,6 +38,7 @@ module Que
       priority: nil,
       run_at: nil,
       retryable: nil,
+      **kwargs
     )
       attrs = {
         job_class: job_class || default_attrs[:job_class],
@@ -45,6 +47,8 @@ module Que
         run_at:    run_at    || default_attrs[:run_at],
         retryable: (retryable.nil? ? default_attrs[:retryable] : retryable),
       }
+
+      args << { KWARGS_KEY => kwargs } if kwargs.any?
 
       # We return an instantiated Job class so that the caller can see the record that's
       # been inserted into the DB. In future, we might wish to change this, but for now
@@ -80,6 +84,14 @@ module Que
     # have been passed in.
     def initialize(attrs)
       @attrs = attrs
+      @args = Array(attrs[:args])
+
+      @kwargs = if @args.last.is_a?(Hash) && @args.last.keys == [KWARGS_KEY]
+        @args.pop[KWARGS_KEY].symbolize_keys
+      else
+        {}
+      end
+
       @stop = false
     end
 
@@ -93,14 +105,14 @@ module Que
       @stop
     end
 
-    def run(*args)
+    def run(*args, **kwargs)
       # In future, we want to raise NotImplementedError here to force subclasses to define
       # run. However Que's tests currently expect to be able to call Que::Job.run
     end
 
     # TODO: Make sole run method (replace _run)
-    def run_and_destroy(*args)
-      run(*args)
+    def run_and_destroy(*args, **kwargs)
+      run(*args, **kwargs)
       destroy
       true # required to keep API compatibility
     end
@@ -111,7 +123,7 @@ module Que
     # gems such as que-failure build their implementation on this. We therefore have to
     # keep the _run method around until we update those gems to match the new API.
     def _run
-      run_and_destroy(*@attrs[:args])
+      run_and_destroy(*@args, **@kwargs)
     end
 
     def destroy

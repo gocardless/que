@@ -94,6 +94,28 @@ RSpec.describe Que::Job do
       end
     end
 
+    context "with keyword args" do
+      let(:job_class) do
+        Class.new(described_class) do
+          def run(name:, password:)
+            true
+          end
+        end
+      end
+
+      it "correctly serializes and deserializes the arguments" do
+        job = job_class.enqueue(name: "Tony", password: "tiger")
+        job._run
+      end
+
+      context "missing the required argument" do
+        it "returns an ArgumentError" do
+          job = job_class.enqueue(name: "Tony")
+          expect { job._run }.to raise_error(ArgumentError, /missing keyword.+password/)
+        end
+      end
+    end
+
     context "when in sync mode" do
       around do |example|
         Que.mode.tap do |old_mode|
