@@ -126,6 +126,12 @@ module Que
       def cast_result(result)
         output = result.to_a
 
+        puts "fields: #{result.fields}"
+        if result.fields.include?("run_at")
+          result.fields.each_with_index do |field, index|
+            puts "  #{field} => #{result.ftype(index)}"
+          end
+        end
         result.fields.each_with_index do |field, index|
           converter = CAST_PROCS[result.ftype(index)]
           next unless converter
