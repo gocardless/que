@@ -15,11 +15,13 @@ module Que
         @worker_group = options.fetch(:worker_group)
         @registry = options.fetch(:registry, Prometheus::Client.registry)
 
+        register(*WorkerGroup::METRICS)
         register(*Worker::METRICS)
         register(*Locker::METRICS)
       end
 
       def call(env)
+        @worker_group.collect_metrics
         @worker_group.workers.each(&:collect_metrics)
         @app.call(env)
       end
