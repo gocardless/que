@@ -5,6 +5,17 @@ require_relative "worker"
 module Que
   class WorkerGroup
     DEFAULT_STOP_TIMEOUT = 5 # seconds
+    METRICS = [
+      ActiveWorkersCount = Prometheus::Client::Gauge.new(
+        :que_worker_group_active_workers_count,
+        docstring: "Number of active workers",
+      ),
+
+      ExpectedWorkersCount = Prometheus::Client::Gauge.new(
+        :que_worker_group_expected_workers_count,
+        docstring: "Number of configured workers",
+      ),
+    ].freeze
 
     def self.start(count, **kwargs)
       Que.logger.info(
@@ -35,6 +46,20 @@ module Que
     end
 
     attr_reader :workers
+
+    def collect_metrics
+      # Threads that are no longer running will have either a status of `nil` (terminated
+      # with error) or `false` (terminated normally). We count threads that have
+      # terminated normally as "active" since the only way for those threads to be in that
+      # state is after an explicit invocation of `stop`, which means we're in the process
+      # of shutting down the whole worker. Without this, attempting to collect metrics
+      # after `stop` has been invoked will report a different number of active vs
+      # configured threads which however is expected.
+      active_threads = @worker_threads.reject { |thread| thread.status.nil? }
+
+      ActiveWorkersCount.set(active_threads.count)
+      ExpectedWorkersCount.set(workers.count)
+    end
 
     def stop(timeout = DEFAULT_STOP_TIMEOUT)
       Que.logger.info(msg: "Asking workers to finish", event: "que.worker.finish_wait")
