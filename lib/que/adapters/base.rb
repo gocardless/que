@@ -10,6 +10,8 @@ module Que
     autoload :Pond,           "que/adapters/pond"
     autoload :Sequel,         "que/adapters/sequel"
 
+    class UnavailableConnection < StandardError; end
+
     class Base
       def initialize(_thing = nil)
         @prepared_statements = {}

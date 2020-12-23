@@ -5,6 +5,8 @@ module Que
     class ActiveRecord < Base
       def checkout
         checkout_activerecord_adapter { |conn| yield conn.raw_connection }
+      rescue ::ActiveRecord::ConnectionTimeoutError => e
+        raise UnavailableConnection
       end
 
       def wake_worker_after_commit
