@@ -237,7 +237,7 @@ module Que
           :job_worked
         end
       end
-    rescue PG::Error => _error
+    rescue PG::Error, Adapters::UnavailableConnection => _error
       # In the event that our Postgres connection is bad, we don't want that error to halt
       # the work loop. Instead, we should let the work loop sleep and retry.
       :postgres_error

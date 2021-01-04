@@ -124,6 +124,17 @@ RSpec.describe Que::Worker do
           expect(subject).to eq(:postgres_error)
         end
       end
+
+      context "when we can't checkout a new connection" do
+        it "rescues it and returns an error" do
+          FakeJob.enqueue(1)
+
+          expect(Que).
+            to receive(:execute).with(:lock_job, ["default", 0]).
+              and_raise(ActiveRecord::ConnectionTimeoutError)
+          expect(subject).to eq(:postgres_error)
+        end
+      end
     end
   end
 end
