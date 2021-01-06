@@ -28,7 +28,7 @@ jobs:
       ruby_version:
         type: string
     docker:
-      - image: circleci/ruby:<< parameters.ruby_version >>
+      - image: cimg/ruby:<< parameters.ruby_version >>
         environment:
           PGDATABASE: que-test
           PGUSER: ubuntu
@@ -56,4 +56,4 @@ workflows:
       - rspec:
           matrix:
             parameters:
-              ruby_version: ["2.6", "2.7"]
+              ruby_version: ["2.6", "2.7", "3.0"]
