@@ -141,6 +141,8 @@ module Que
     def work_loop
       return if @stop
 
+      raise "Send me to sentry"
+
       @tracer.trace(RunningSecondsTotal, queue: @queue) do
         loop do
           case event = work
