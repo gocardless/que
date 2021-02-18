@@ -23,7 +23,7 @@ module Que
         event: "que.worker.start",
         worker_count: count,
       )
-
+      raise "Send me to sentry (primary thread)"
       workers = Array.new(count) { Worker.new(**kwargs) }
       worker_threads = workers.map { |worker| Thread.new { worker.work_loop } }
 
