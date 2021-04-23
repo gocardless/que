@@ -3,10 +3,15 @@
 module Que
   module Adapters
     class ActiveRecord < Base
+      AR_UNAVAILABLE_CONNECTION_ERRORS = [
+        ::ActiveRecord::ConnectionTimeoutError,
+        ::ActiveRecord::ConnectionNotEstablished,
+      ].freeze
+
       def checkout
         checkout_activerecord_adapter { |conn| yield conn.raw_connection }
-      rescue ::ActiveRecord::ConnectionTimeoutError => e
-        raise UnavailableConnection
+      rescue *AR_UNAVAILABLE_CONNECTION_ERRORS => e
+        raise UnavailableConnection.new(e)
       end
 
       def wake_worker_after_commit
