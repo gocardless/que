@@ -9,6 +9,7 @@ require "ostruct"
 require "que"
 require "rack"
 require "prometheus/middleware/exporter"
+require "webrick"
 
 $stdout.sync = true
 

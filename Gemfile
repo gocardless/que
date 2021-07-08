@@ -21,11 +21,6 @@ group :test do
   gem 'rspec', '~> 3.9'
 end
 
-platforms :rbx do
-  gem 'json', '~> 1.8'
-  gem 'rubysl', '~> 2.0'
-end
-
 gem 'prometheus-client', '~> 1.0'
 gem 'prometheus_gcstat', git: 'git@github.com:gocardless/prometheus_gcstat_ruby'
 

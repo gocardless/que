@@ -1,10 +1,10 @@
 ---
-version: 2
+version: 2.1
+
 jobs:
-  build:
-    working_directory: ~/que
+  test:
     docker:
-      - image: circleci/ruby:2.6.5
+      - image: cimg/ruby:<< parameters.ruby-version >>
         environment:
           PGDATABASE: que-test
           PGUSER: ubuntu
@@ -15,13 +15,31 @@ jobs:
           POSTGRES_DB: que-test
           POSTGRES_USER: ubuntu
           POSTGRES_PASSWORD: password
+    parameters:
+      ruby-version:
+        type: string
     steps:
       - checkout
       - restore_cache:
-          key: gemfile-265-{{ .Branch }}-{{ checksum "Gemfile" }}
-      - run: bundle install
+          keys:
+            - bundle-v1-<< parameters.ruby-version >>-{{ checksum "que.gemspec" }}
+            - bundle-v1-<< parameters.ruby-version >>-
+      - run:
+          name: Install dependencies
+          command: bundle install --clean --no-cache --path vendor/bundle --jobs=4 --retry=3
       - save_cache:
-          key: gemfile-265-{{ .Branch }}-{{ checksum "Gemfile" }}
+          key: bundle-v1-<< parameters.ruby-version >>-{{ checksum "que.gemspec" }}
           paths:
-            - "vendor/bundle"
-      - run: bundle exec rspec
+            - vendor/bundle
+      - run:
+          name: Run tests
+          command: bundle exec rspec
+
+workflows:
+  default:
+    jobs:
+      - test:
+          name: Ruby << matrix.ruby-version >>
+          matrix:
+            parameters:
+              ruby-version: ["2.5.8", "2.6.6", "2.7.2", "3.0.0"]
