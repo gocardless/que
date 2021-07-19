@@ -80,8 +80,14 @@ module Que
 
       private
 
-      def checkout_activerecord_adapter(&block)
-        ::ActiveRecord::Base.connection_pool.with_connection(&block)
+      def checkout_activerecord_adapter
+        # .connection returns the cached connection for the thread, or checks out
+        # a new one if one doesn't exist. This ensures that the thread re-uses the
+        # same connection everytime.
+        #
+        # This necessary especially for pg advisory locks, where the lock needs to be
+        # acquired and released by the same connection.
+        yield ::ActiveRecord::Base.connection_pool.connection
       end
     end
   end
