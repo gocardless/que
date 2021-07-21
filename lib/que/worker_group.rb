@@ -35,7 +35,10 @@ module Que
       # We can set our worker thread priority to be a value less than our parent thread to
       # ensure this is the case. Different Ruby runtimes have different priority systems,
       # but -10 should do the trick for all of them.
-      worker_threads.each { |thread| thread.priority = Thread.current.priority - 10 }
+      worker_threads.each_with_index do |thread, index|
+        thread.priority = Thread.current.priority - 10
+        thread.name = "worker-thread-#{index}"
+      end
 
       new(workers, worker_threads)
     end
