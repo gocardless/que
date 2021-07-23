@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "pg"
+require "active_record/errors"
 
 module Que
   module Adapters
