@@ -2,6 +2,14 @@
 
 require "pg"
 
+if ActiveRecord::VERSION::MAJOR == 6 && ActiveRecord::VERSION::MINOR == 0
+  # In the 6.0.x releases, `ConnectionTimeoutError` was defined within the connection
+  # pool class in AR and therefore not autoloaded alongside the rest of AR, which sadly
+  # it means we need to explicitly require the file that defines it or we won't be able
+  # to catch the exception.
+  require "active_record/connection_adapters/abstract/connection_pool"
+end
+
 module Que
   module Adapters
     class ActiveRecord < Base
