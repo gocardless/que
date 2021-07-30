@@ -9,6 +9,7 @@ require "ostruct"
 require "que"
 require "rack"
 require "prometheus/middleware/exporter"
+require "rack-timeout"
 
 $stdout.sync = true
 
@@ -54,6 +55,10 @@ OptionParser.new do |opts|
     options.timeout = timeout
   end
 
+  opts.on("--metrics-request-timeout [TIMEOUT]", Integer, "Max duration (in seconds) for metrics HTTP requests to be served") do |timeout|
+    options.metrics_request_timeout = timeout
+  end
+
   opts.on("-v", "--version", "Show Que version") do
     require "que"
     $stdout.puts "Que version #{Que::Version}"
@@ -83,12 +88,13 @@ rescue LoadError
   $stdout.puts "Could not load file '#{file}'"
 end
 
-log_level      = options.log_level     || ENV["QUE_LOG_LEVEL"]           || "info"
-queue_name     = options.queue_name    || ENV["QUE_QUEUE"]               || Que::Worker::DEFAULT_QUEUE
-wake_interval  = options.wake_interval || ENV["QUE_WAKE_INTERVAL"]&.to_f || Que::Worker::DEFAULT_WAKE_INTERVAL
-cursor_expiry  = options.cursor_expiry || wake_interval
-worker_count   = options.worker_count  || 1
-timeout        = options.timeout
+log_level       = options.log_level     || ENV["QUE_LOG_LEVEL"]           || "info"
+queue_name      = options.queue_name    || ENV["QUE_QUEUE"]               || Que::Worker::DEFAULT_QUEUE
+wake_interval   = options.wake_interval || ENV["QUE_WAKE_INTERVAL"]&.to_f || Que::Worker::DEFAULT_WAKE_INTERVAL
+cursor_expiry   = options.cursor_expiry || wake_interval
+worker_count    = options.worker_count  || 1
+timeout         = options.timeout
+metrics_timeout = options.metrics_request_timeout || ENV["RACK_TIMEOUT_SERVICE_TIMEOUT"] || 30
 
 Que.logger ||= Logger.new(STDOUT)
 
@@ -130,6 +136,7 @@ if options.metrics_port
 
     app = Rack::URLMap.new(
       "/" => Rack::Builder.new do
+        use Rack::Timeout, service_timeout: metrics_timeout
         use Que::Middleware::WorkerCollector, worker_group: worker_group
         use Prometheus::Middleware::Exporter
 
@@ -138,6 +145,7 @@ if options.metrics_port
       "/queue" => Rack::Builder.new do
         registry = Prometheus::Client::Registry.new
 
+        use Rack::Timeout, service_timeout: metrics_timeout
         use Que::Middleware::QueueCollector, registry: registry
         use Prometheus::Middleware::Exporter, registry: registry
 
