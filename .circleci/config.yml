@@ -1,10 +1,34 @@
----
-version: 2
+version: 2.1
+
+references:
+  bundle_install: &bundle_install
+    run:
+      name: Bundle
+      command: |
+        gem install bundler --no-document && \
+        bundle config set no-cache 'true' && \
+        bundle config set jobs '4' && \
+        bundle config set retry '3' && \
+        bundle install
+
+  cache_bundle: &cache_bundle
+    save_cache:
+      key: bundle-<< parameters.ruby_version >>-{{ checksum "que.gemspec" }}-{{ checksum "Gemfile" }}
+      paths:
+        - vendor/bundle
+
+  restore_bundle: &restore_bundle
+    restore_cache:
+      key: bundle-<< parameters.ruby_version >>-{{ checksum "que.gemspec" }}-{{ checksum "Gemfile" }}
+
 jobs:
-  build:
+  rspec:
     working_directory: ~/que
+    parameters:
+      ruby_version:
+        type: string
     docker:
-      - image: circleci/ruby:2.6.5
+      - image: circleci/ruby:<< parameters.ruby_version >>
         environment:
           PGDATABASE: que-test
           PGUSER: ubuntu
@@ -16,12 +40,20 @@ jobs:
           POSTGRES_USER: ubuntu
           POSTGRES_PASSWORD: password
     steps:
+      - add_ssh_keys
       - checkout
-      - restore_cache:
-          key: gemfile-265-{{ .Branch }}-{{ checksum "Gemfile" }}
-      - run: bundle install
-      - save_cache:
-          key: gemfile-265-{{ .Branch }}-{{ checksum "Gemfile" }}
-          paths:
-            - "vendor/bundle"
-      - run: bundle exec rspec
+      - *restore_bundle
+      - *bundle_install
+      - *cache_bundle
+      - run:
+          name: Run specs
+          command: bundle exec rspec
+
+workflows:
+  version: 2
+  tests:
+    jobs:
+      - rspec:
+          matrix:
+            parameters:
+              ruby_version: ["2.6", "2.7"]
