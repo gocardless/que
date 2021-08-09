@@ -6,19 +6,19 @@ module Que
   module Adapters
     class ActiveRecord < Base
       AR_UNAVAILABLE_CONNECTION_ERRORS = [
-        ::ActiveRecord::ConnectionTimeoutError,
-        ::ActiveRecord::ConnectionNotEstablished,
-        ::PG::ConnectionBad,
-        ::PG::ServerError,
-        ::PG::UnableToSend,
+        "::ActiveRecord::ConnectionTimeoutError",
+        "::ActiveRecord::ConnectionNotEstablished",
+        "::PG::ConnectionBad",
+        "::PG::ServerError",
+        "::PG::UnableToSend",
       ].freeze
 
       def checkout
         checkout_activerecord_adapter { |conn| yield conn.raw_connection }
-      rescue *AR_UNAVAILABLE_CONNECTION_ERRORS => e
+      rescue *AR_UNAVAILABLE_CONNECTION_ERRORS.map(&:constantize) => e
         raise UnavailableConnection, e
       rescue ::ActiveRecord::StatementInvalid => e
-        raise e unless AR_UNAVAILABLE_CONNECTION_ERRORS.include?(e.cause.class)
+        raise e unless AR_UNAVAILABLE_CONNECTION_ERRORS.include?(e.cause.class.to_s)
 
         # ActiveRecord::StatementInvalid is one of the most generic exceptions AR can
         # raise, so we catch it and only handle the specific nested exceptions.
