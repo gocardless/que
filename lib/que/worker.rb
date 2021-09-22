@@ -216,7 +216,7 @@ module Que
                 duration: duration,
               )
             )
-          rescue StandardError, JobTimeoutError => error
+          rescue StandardError, NotImplementedError, JobTimeoutError => error
             JobErrorTotal.increment(labels: labels)
             Que.logger&.error(
               log_keys.merge(
