@@ -14,6 +14,12 @@ module Que
         labels: %i[queue job_class priority due failed],
       )
 
+      QueuedPastDue = Prometheus::Client::Gauge.new(
+        :que_queue_queued_past_due_seconds,
+        docstring: "Max seconds past due, by job_class/priority/due/failed",
+        labels: %i[queue job_class priority due failed],
+      )
+
       def initialize(app, options = {})
         @app = app
         @registry = options.fetch(:registry, Prometheus::Client.registry)
@@ -35,21 +41,27 @@ module Que
         # Reset all the previously observed values back to zero, ensuring we only ever
         # report metric values that are current in every scrape.
         Queued.values.each { |labels, _| Queued.set(0.0, labels: labels) }
+        QueuedPastDue.values.each { |labels, _| QueuedPastDue.set(0.0, labels: labels) }
 
         refresh_materialized_view if due_refresh?
 
         # Now we can safely update our gauges, touching only those that exist
         # in our queue
         Que.execute("select * from que_jobs_summary").each do |labels|
+          metric_labels = {
+            queue: labels["queue"],
+            job_class: labels["job_class"],
+            priority: labels["priority"],
+            due: labels["due"],
+            failed: labels["failed"],
+          }
           Queued.set(
             labels["count"],
-            labels: {
-              queue: labels["queue"],
-              job_class: labels["job_class"],
-              priority: labels["priority"],
-              due: labels["due"],
-              failed: labels["failed"],
-            },
+            labels: metric_labels,
+          )
+          QueuedPastDue.set(
+            labels["max_seconds_past_due"],
+            labels: metric_labels,
           )
         end
 
@@ -67,8 +79,8 @@ module Que
           Que.execute("refresh materialized view que_jobs_summary;")
           Que.execute("analyze que_jobs_summary;")
         end
-      rescue StandardError => err
-        Que.logger.info(event: "refresh_materialized_view", error: err.to_s)
+      rescue StandardError => e
+        Que.logger.info(event: "refresh_materialized_view", error: e.to_s)
       end
 
       def due_refresh?
