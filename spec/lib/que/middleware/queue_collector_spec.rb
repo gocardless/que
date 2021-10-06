@@ -6,12 +6,15 @@ RSpec.describe Que::Middleware::QueueCollector do
   subject(:collector) { described_class.new(->(_env) { nil }) }
 
   let(:now) { postgres_now }
-  let(:due_now) { now - 1000 }
+  let(:due_now_delay) { 1000.0 }
+  let(:due_later_than_now_delay) { due_now_delay / 2 }
+  let(:due_now) { now - due_now_delay }
+  let(:due_later_than_now) { now - due_later_than_now_delay }
   let(:pending_now) { now + 1000 }
 
   before do
     FakeJob.enqueue(run_at: due_now, priority: 1) # due, should be runnable
-    FakeJob.enqueue(run_at: due_now, priority: 1) # same as above, for 2nd count
+    FakeJob.enqueue(run_at: due_later_than_now, priority: 1) # same as above, for 2nd count
     FakeJob.enqueue(run_at: due_now, priority: 10) # due, different priority
 
     # scheduled, not runnable
@@ -43,6 +46,23 @@ RSpec.describe Que::Middleware::QueueCollector do
           due: "false", failed:  "false" } => 1.0,
         { queue: "default", job_class: "FakeJob", priority: "20",
           due: "false", failed:  "true" } => 1.0,
+      )
+    end
+
+    it "sets past due metric values from queue" do
+      collector.call({})
+
+      expect(described_class::QueuedPastDue.values).to eql(
+        { queue: "default", job_class: "FakeJob", priority: "1",
+          due: "true", failed:  "false" } => due_now_delay,
+        { queue: "default", job_class: "FakeJob", priority: "10",
+          due: "true", failed:  "false" } => due_now_delay,
+        { queue: "default", job_class: "FakeJob", priority: "1",
+          due: "false", failed:  "false" } => 0.0,
+        { queue: "another", job_class: "FakeJob", priority: "1",
+          due: "false", failed:  "false" } => 0.0,
+        { queue: "default", job_class: "FakeJob", priority: "20",
+          due: "false", failed:  "true" } => 0.0,
       )
     end
 

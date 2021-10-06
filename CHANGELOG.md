@@ -7,6 +7,7 @@
 *   Apply label to locker metrics to indicate cursor presence
 *   Pin Prometheus to a GoCardless feature branch [link](https://github.com/gocardless/prometheus_client_ruby/tree/gc_production_branch_do_not_push) that is incompatible with upstream. This version has breaking API changes and includes new features such as pluggable data stores.
 *   Add `failed` label to queue collector middleware
+*   Add a `que_queue_queued_past_due_seconds` metric stating the maximum seconds past due a job is
 
 ### 1.0.0 (2018-07-20)
 
