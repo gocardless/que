@@ -30,6 +30,11 @@ module Que
           Prometheus::Client::Registry::AlreadyRegisteredError
         end
         begin
+          @registry.register(QueuedPastDue)
+        rescue StandardError
+          Prometheus::Client::Registry::AlreadyRegisteredError
+        end
+        begin
           @registry.register(DeadTuples)
         rescue StandardError
           Prometheus::Client::Registry::AlreadyRegisteredError
