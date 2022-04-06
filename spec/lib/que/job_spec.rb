@@ -18,20 +18,45 @@ RSpec.describe Que::Job do
       expect(job.args).to eql(["hello"])
     end
 
-    it "logs" do
-      expect(Que.logger).to receive(:info).with(
-        event: "que_job.job_enqueued",
-        msg: "Job enqueued",
-        que_job_id: an_instance_of(Integer),
-        queue: "default",
-        priority: 100,
-        job_class: "Que::Job",
-        retryable: true,
-        run_at: run_at,
-        args: ["hello"],
-      )
+    context "logs" do
+      it "logs to que logger" do
+        expect(Que.logger).to receive(:info).with(
+          event: "que_job.job_enqueued",
+          msg: "Job enqueued",
+          que_job_id: an_instance_of(Integer),
+          queue: "default",
+          priority: 100,
+          job_class: "Que::Job",
+          retryable: true,
+          run_at: run_at,
+          args: ["hello"],
+        )
 
-      described_class.enqueue(:hello, run_at: run_at)
+        described_class.enqueue(:hello, run_at: run_at)
+      end
+
+      it "logs custom context to que logger" do
+        class TestJob < Que::Job
+          custom_log_context -> (job) {
+            { currency: job.args[1] }
+          }
+        end
+
+        expect(Que.logger).to receive(:info).with(
+          event: "que_job.job_enqueued",
+          msg: "Job enqueued",
+          que_job_id: an_instance_of(Integer),
+          queue: "default",
+          priority: 100,
+          job_class: "TestJob",
+          retryable: true,
+          run_at: run_at,
+          args: ["hello"],
+          currency: "gbp",
+        )
+
+        TestJob.enqueue(500, :gbp, :testing,  run_at: run_at)
+      end
     end
 
     context "with a custom adapter specified" do
