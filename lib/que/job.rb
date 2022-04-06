@@ -30,6 +30,10 @@ module Que
       @adapter || Que.adapter
     end
 
+    def self.log_context_lambda
+      @log_context_lambda
+    end
+
     def self.enqueue(
       *args,
       job_class: nil,
@@ -68,6 +72,7 @@ module Que
           que_job_id: job.attrs["job_id"],
           args: job.attrs["args"],
           **job.attrs.symbolize_keys.slice(*JOB_OPTIONS),
+          **job.get_custom_log_context,
         )
       end
       job
@@ -75,6 +80,11 @@ module Que
 
     def self.run(*args)
       new(args: args).tap { |job| job.run(*args) }
+    end
+
+    def self.custom_log_context(log_context_lambda)
+      # TODO: Validate type
+      @log_context_lambda = log_context_lambda
     end
 
     # This is accepting JOB_OPTIONS and args as keyword parameters. In future we want to
@@ -120,6 +130,10 @@ module Que
     def destroy
       self.class.adapter.
         execute(:destroy_job, @attrs.values_at(:queue, :priority, :run_at, :job_id))
+    end
+
+    def get_custom_log_context
+      self.class&.log_context_lambda&.call(self)
     end
   end
 end

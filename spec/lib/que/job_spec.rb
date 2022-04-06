@@ -38,7 +38,10 @@ RSpec.describe Que::Job do
       it "logs custom context to que logger" do
         class TestJob < Que::Job
           custom_log_context -> (job) {
-            { currency: job.args[1] }
+            {
+              currency: job.attrs[:args][1],
+              tag: "test-tag",
+            }
           }
         end
 
@@ -51,8 +54,9 @@ RSpec.describe Que::Job do
           job_class: "TestJob",
           retryable: true,
           run_at: run_at,
-          args: ["hello"],
+          args: [500, "gbp", "testing"],
           currency: "gbp",
+          tag: "test-tag",
         )
 
         TestJob.enqueue(500, :gbp, :testing,  run_at: run_at)
