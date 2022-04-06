@@ -133,7 +133,7 @@ module Que
     end
 
     def get_custom_log_context
-      self.class&.log_context_lambda&.call(self)
+      self.class&.log_context_lambda&.call(self) || {}
     end
   end
 end
