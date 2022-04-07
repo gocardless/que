@@ -108,23 +108,35 @@ RSpec.describe Que::Worker do
       end
 
       it "logs the work" do
-        ExceptionalJob.enqueue(1)
+        class ExceptionalJobWithCustomLogging < ExceptionalJob
+          custom_log_context -> (job) {
+            {
+              first_arg: job.attrs[:args][0],
+            }
+          }
+
+          @log = []
+        end
+
+        ExceptionalJobWithCustomLogging.enqueue(1)
 
         expect(Que.logger).to receive(:info).
           with(hash_including(
                  event: "que_job.job_begin",
-                 handler: "ExceptionalJob",
-                 job_class: "ExceptionalJob",
+                 handler: "ExceptionalJobWithCustomLogging",
+                 job_class: "ExceptionalJobWithCustomLogging",
                  msg: "Job acquired, beginning work",
+                 first_arg: 1
                ))
 
         expect(Que.logger).to receive(:error).
           with(hash_including(
                  event: "que_job.job_error",
-                 handler: "ExceptionalJob",
-                 job_class: "ExceptionalJob",
+                 handler: "ExceptionalJobWithCustomLogging",
+                 job_class: "ExceptionalJobWithCustomLogging",
                  msg: "Job failed with error",
                  error: "#<ExceptionalJob::Error: bad argument 1>",
+                 first_arg: 1
                ))
 
         subject
