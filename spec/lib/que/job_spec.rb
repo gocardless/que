@@ -196,4 +196,55 @@ RSpec.describe Que::Job do
       expect(job_class.default_attrs[:run_at]).to eq(run_at)
     end
   end
+
+  describe ".custom_log_context" do
+    let!(:job_class) { Class.new(described_class) }
+
+    it "adds static tags" do
+      job_class.custom_log_context -> (_) {
+        {
+          test_key_1: "One",
+          test_key_2: "Two",
+        }
+      }
+
+      test_instance = job_class.enqueue("irrelevant-arg")
+
+      expect(test_instance.get_custom_log_context).to eq({
+        test_key_1: "One",
+        test_key_2: "Two",
+      })
+    end
+
+    it "adds dynamic tags" do
+      job_class.custom_log_context -> (job) {
+        {
+          first_argument: job.attrs[:args][0],
+          second_argument: job.attrs[:args][1],
+          third_argument: job.attrs[:args][2],
+          adapter: job.class.adapter.class.to_s,
+        }
+      }
+
+      test_instance = job_class.enqueue("a", 2, false)
+
+      expect(test_instance.get_custom_log_context).to eq({
+        first_argument: "a",
+        second_argument: 2,
+        third_argument: false,
+        adapter: "Que::Adapters::ActiveRecord",
+      })
+    end
+
+    it "raises an ArgumentError unless given a proc" do
+      msg = "Custom log context must be a Proc which receives the job as an argument and returns a hash"
+
+      expect { job_class.custom_log_context 100 }.
+        to raise_error(ArgumentError, msg)
+
+      test_instance = job_class.enqueue("irrelevant-arg")
+
+      expect(test_instance.get_custom_log_context).to eq({})
+    end
+  end
 end

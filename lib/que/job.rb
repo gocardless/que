@@ -84,7 +84,13 @@ module Que
     end
 
     def self.custom_log_context(custom_proc)
-      define_method(:log_context_proc) { custom_proc }
+      if custom_proc.is_a?(Proc)
+        define_method(:log_context_proc) { custom_proc }
+      else
+        raise ArgumentError.new "Custom log context must be a Proc " \
+                                "which receives the job as an argument and " \
+                                "returns a hash"
+      end
     end
 
     def get_custom_log_context
@@ -135,5 +141,7 @@ module Que
       self.class.adapter.
         execute(:destroy_job, @attrs.values_at(:queue, :priority, :run_at, :job_id))
     end
+
+    protected :log_context_proc
   end
 end
