@@ -42,7 +42,7 @@ RSpec.describe Que::Job do
           que_job_id: an_instance_of(Integer),
           queue: "default",
           priority: 100,
-          job_class: "FakeJobWithCustomLogs",
+          job_class: a_string_including("Class"),
           retryable: true,
           run_at: run_at,
           args: [500, "gbp", "testing"],
@@ -50,7 +50,14 @@ RSpec.describe Que::Job do
           custom_log_2: "test-log",
         )
 
-        FakeJobWithCustomLogs.enqueue(500, :gbp, :testing,  run_at: run_at)
+        job_class = Class.new(described_class)
+        job_class.custom_log_context ->(job) {
+          {
+            custom_log_1: job.attrs[:args][0],
+            custom_log_2: "test-log",
+          }
+        }
+        job_class.enqueue(500, :gbp, :testing,  run_at: run_at)
       end
     end
 
