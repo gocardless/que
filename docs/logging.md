@@ -31,7 +31,7 @@ Que.log :level => :debug, :my_output => 'my string'
 #=> D, [2014-01-12T05:16:15.221941 #5088] DEBUG -- : {"lib":"que","thread":24960,"my_output":"my string"}
 ```
 
-Que provides four logs by default: `job_enqueued`, `job_begin`, `job_worked` and `job_error`. If you'd like to include custom keys in these logs, you can do this by setting a up proc with `custom_log_context`. The proc receives the job instance as an argument so you have access to all the metadata. Make sure that the proc returns a hash:
+Que logs for type of events by default: `job_enqueued`, `job_begin`, `job_worked` and `job_error`. If you'd like to include custom keys in these events, you can do this by setting up a proc with `custom_log_context`. The proc receives the job instance as an argument so you have access to all the metadata. Make sure that the proc returns a hash:
 
 ```ruby
   class ExampleJob
