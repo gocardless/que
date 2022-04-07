@@ -36,30 +36,21 @@ RSpec.describe Que::Job do
       end
 
       it "logs custom context to que logger" do
-        class TestJob < Que::Job
-          custom_log_context -> (job) {
-            {
-              currency: job.attrs[:args][1],
-              tag: "test-tag",
-            }
-          }
-        end
-
         expect(Que.logger).to receive(:info).with(
           event: "que_job.job_enqueued",
           msg: "Job enqueued",
           que_job_id: an_instance_of(Integer),
           queue: "default",
           priority: 100,
-          job_class: "TestJob",
+          job_class: "FakeJobWithCustomLogs",
           retryable: true,
           run_at: run_at,
           args: [500, "gbp", "testing"],
-          currency: "gbp",
-          tag: "test-tag",
+          custom_log_1: 500,
+          custom_log_2: "test-log",
         )
 
-        TestJob.enqueue(500, :gbp, :testing,  run_at: run_at)
+        FakeJobWithCustomLogs.enqueue(500, :gbp, :testing,  run_at: run_at)
       end
     end
 
