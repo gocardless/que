@@ -91,7 +91,7 @@ module Que
     end
 
     def get_custom_log_context
-      self.class&.log_context_proc&.call(self) || {}
+      self.class&.log_context_proc&.call(@attrs) || {}
     end
 
     # This is accepting JOB_OPTIONS and args as keyword parameters. In future we want to
@@ -138,7 +138,5 @@ module Que
       self.class.adapter.
         execute(:destroy_job, @attrs.values_at(:queue, :priority, :run_at, :job_id))
     end
-
-    protected :log_context_proc
   end
 end

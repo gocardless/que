@@ -51,9 +51,9 @@ RSpec.describe Que::Job do
         )
 
         job_class = Class.new(described_class)
-        job_class.custom_log_context ->(job) {
+        job_class.custom_log_context ->(attrs) {
           {
-            custom_log_1: job.attrs[:args][0],
+            custom_log_1: attrs[:args][0],
             custom_log_2: "test-log",
           }
         }
@@ -224,12 +224,12 @@ RSpec.describe Que::Job do
     end
 
     it "adds dynamic tags" do
-      job_class.custom_log_context -> (job) {
+      job_class.custom_log_context -> (attrs) {
         {
-          first_argument: job.attrs[:args][0],
-          second_argument: job.attrs[:args][1],
-          third_argument: job.attrs[:args][2],
-          adapter: job.class.adapter.class.to_s,
+          first_argument: attrs[:args][0],
+          second_argument: attrs[:args][1],
+          third_argument: attrs[:args][2],
+          retryable: attrs[:retryable],
         }
       }
 
@@ -239,7 +239,7 @@ RSpec.describe Que::Job do
         first_argument: "a",
         second_argument: 2,
         third_argument: false,
-        adapter: "Que::Adapters::ActiveRecord",
+        retryable: true,
       })
     end
 

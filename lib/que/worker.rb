@@ -166,7 +166,6 @@ module Que
           return :job_not_found if job.nil?
 
           klass = class_for(job[:job_class])
-          job_instance = klass.new(job)
 
           log_keys = {
             priority: job["priority"],
@@ -175,7 +174,7 @@ module Que
             job_class: job["job_class"],
             job_error_count: job["error_count"],
             que_job_id: job["job_id"],
-            **job_instance.get_custom_log_context,
+            **(klass.log_context_proc&.call(job) || {}),
           }
 
           labels = {
@@ -200,7 +199,7 @@ module Que
             duration = Benchmark.measure do
               # TODO: _run -> run_and_destroy(*job[:args])
               @tracer.trace(JobWorkedSecondsTotal, labels) do
-                job_instance.tap do |inst|
+                klass.new(job).tap do |inst|
                   @current_running_job = inst
                   begin
                     inst._run
