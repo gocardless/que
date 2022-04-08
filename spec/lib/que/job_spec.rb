@@ -18,47 +18,45 @@ RSpec.describe Que::Job do
       expect(job.args).to eql(["hello"])
     end
 
-    context "logs" do
-      it "logs to que logger" do
-        expect(Que.logger).to receive(:info).with(
-          event: "que_job.job_enqueued",
-          msg: "Job enqueued",
-          que_job_id: an_instance_of(Integer),
-          queue: "default",
-          priority: 100,
-          job_class: "Que::Job",
-          retryable: true,
-          run_at: run_at,
-          args: ["hello"],
-        )
+    it "logs" do
+      expect(Que.logger).to receive(:info).with(
+        event: "que_job.job_enqueued",
+        msg: "Job enqueued",
+        que_job_id: an_instance_of(Integer),
+        queue: "default",
+        priority: 100,
+        job_class: "Que::Job",
+        retryable: true,
+        run_at: run_at,
+        args: ["hello"],
+      )
 
-        described_class.enqueue(:hello, run_at: run_at)
-      end
+      described_class.enqueue(:hello, run_at: run_at)
+    end
 
-      it "logs custom context to que logger" do
-        expect(Que.logger).to receive(:info).with(
-          event: "que_job.job_enqueued",
-          msg: "Job enqueued",
-          que_job_id: an_instance_of(Integer),
-          queue: "default",
-          priority: 100,
-          job_class: a_string_including("Class"),
-          retryable: true,
-          run_at: run_at,
-          args: [500, "gbp", "testing"],
-          custom_log_1: 500,
+    it "logs custom context" do
+      expect(Que.logger).to receive(:info).with(
+        event: "que_job.job_enqueued",
+        msg: "Job enqueued",
+        que_job_id: an_instance_of(Integer),
+        queue: "default",
+        priority: 100,
+        job_class: a_string_including("Class"),
+        retryable: true,
+        run_at: run_at,
+        args: [500, "gbp", "testing"],
+        custom_log_1: 500,
+        custom_log_2: "test-log",
+      )
+
+      job_class = Class.new(described_class)
+      job_class.custom_log_context ->(attrs) {
+        {
+          custom_log_1: attrs[:args][0],
           custom_log_2: "test-log",
-        )
-
-        job_class = Class.new(described_class)
-        job_class.custom_log_context ->(attrs) {
-          {
-            custom_log_1: attrs[:args][0],
-            custom_log_2: "test-log",
-          }
         }
-        job_class.enqueue(500, :gbp, :testing,  run_at: run_at)
-      end
+      }
+      job_class.enqueue(500, :gbp, :testing,  run_at: run_at)
     end
 
     context "with a custom adapter specified" do

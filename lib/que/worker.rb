@@ -199,10 +199,10 @@ module Que
             duration = Benchmark.measure do
               # TODO: _run -> run_and_destroy(*job[:args])
               @tracer.trace(JobWorkedSecondsTotal, labels) do
-                klass.new(job).tap do |inst|
-                  @current_running_job = inst
+                klass.new(job).tap do |job_instance|
+                  @current_running_job = job_instance
                   begin
-                    inst._run
+                    job_instance._run
                   ensure
                     @current_running_job = nil
                   end

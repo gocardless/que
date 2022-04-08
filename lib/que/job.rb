@@ -91,7 +91,7 @@ module Que
     end
 
     def get_custom_log_context
-      self.class&.log_context_proc&.call(@attrs) || {}
+      self.class.log_context_proc&.call(@attrs) || {}
     end
 
     # This is accepting JOB_OPTIONS and args as keyword parameters. In future we want to
