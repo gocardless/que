@@ -205,29 +205,19 @@ RSpec.describe Que::Job do
   describe ".custom_log_context" do
     let!(:job_class) { Class.new(described_class) }
 
-    it "adds static tags" do
-      job_class.custom_log_context -> (_) {
-        {
-          test_key_1: "One",
-          test_key_2: "Two",
-        }
-      }
-
+    it "returns a blank hash if not specified" do
       test_instance = job_class.enqueue("irrelevant-arg")
-
-      expect(test_instance.get_custom_log_context).to eq({
-        test_key_1: "One",
-        test_key_2: "Two",
-      })
+      expect(test_instance.get_custom_log_context).to eq({})
     end
 
-    it "adds dynamic tags" do
+    it "returns a hash of keys constructed from the job attrs" do
       job_class.custom_log_context -> (attrs) {
         {
           first_argument: attrs[:args][0],
           second_argument: attrs[:args][1],
           third_argument: attrs[:args][2],
           retryable: attrs[:retryable],
+          static_key: "x",
         }
       }
 
@@ -238,6 +228,7 @@ RSpec.describe Que::Job do
         second_argument: 2,
         third_argument: false,
         retryable: true,
+        static_key: "x",
       })
     end
 
