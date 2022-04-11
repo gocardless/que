@@ -34,6 +34,31 @@ RSpec.describe Que::Job do
       described_class.enqueue(:hello, run_at: run_at)
     end
 
+    it "logs custom context" do
+      expect(Que.logger).to receive(:info).with(
+        event: "que_job.job_enqueued",
+        msg: "Job enqueued",
+        que_job_id: an_instance_of(Integer),
+        queue: "default",
+        priority: 100,
+        job_class: a_string_including("Class"),
+        retryable: true,
+        run_at: run_at,
+        args: [500, "gbp", "testing"],
+        custom_log_1: 500,
+        custom_log_2: "test-log",
+      )
+
+      job_class = Class.new(described_class)
+      job_class.custom_log_context ->(attrs) {
+        {
+          custom_log_1: attrs[:args][0],
+          custom_log_2: "test-log",
+        }
+      }
+      job_class.enqueue(500, :gbp, :testing,  run_at: run_at)
+    end
+
     context "with a custom adapter specified" do
       let(:custom_adapter) { Que.adapter.dup }
       let(:job_with_adapter) { Class.new(described_class) }
@@ -174,6 +199,48 @@ RSpec.describe Que::Job do
       job_class = Class.new(described_class) { @run_at = -> { run_at } }
 
       expect(job_class.default_attrs[:run_at]).to eq(run_at)
+    end
+  end
+
+  describe ".custom_log_context" do
+    let!(:job_class) { Class.new(described_class) }
+
+    it "returns a blank hash if not specified" do
+      test_instance = job_class.enqueue("irrelevant-arg")
+      expect(test_instance.get_custom_log_context).to eq({})
+    end
+
+    it "returns a hash of keys constructed from the job attrs" do
+      job_class.custom_log_context -> (attrs) {
+        {
+          first_argument: attrs[:args][0],
+          second_argument: attrs[:args][1],
+          third_argument: attrs[:args][2],
+          retryable: attrs[:retryable],
+          static_key: "x",
+        }
+      }
+
+      test_instance = job_class.enqueue("a", 2, false)
+
+      expect(test_instance.get_custom_log_context).to eq({
+        first_argument: "a",
+        second_argument: 2,
+        third_argument: false,
+        retryable: true,
+        static_key: "x",
+      })
+    end
+
+    it "raises an ArgumentError unless given a proc" do
+      msg = "Custom log context must be a Proc which receives the job as an argument and returns a hash"
+
+      expect { job_class.custom_log_context 100 }.
+        to raise_error(ArgumentError, msg)
+
+      test_instance = job_class.enqueue("irrelevant-arg")
+
+      expect(test_instance.get_custom_log_context).to eq({})
     end
   end
 end

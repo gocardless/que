@@ -9,6 +9,8 @@ module Que
     JOB_OPTIONS = %i[queue priority run_at job_class retryable].freeze
     JOB_INSTANCE_FIELDS = %i[queue priority run_at job_id].freeze
 
+    class_attribute :log_context_proc
+
     # These are set in the class definition of the Job, as instance variables on the class
     def self.default_attrs
       {
@@ -68,6 +70,7 @@ module Que
           que_job_id: job.attrs["job_id"],
           args: job.attrs["args"],
           **job.attrs.symbolize_keys.slice(*JOB_OPTIONS),
+          **job.get_custom_log_context,
         )
       end
       job
@@ -75,6 +78,20 @@ module Que
 
     def self.run(*args)
       new(args: args).tap { |job| job.run(*args) }
+    end
+
+    def self.custom_log_context(custom_proc)
+      if custom_proc.is_a?(Proc)
+        self.log_context_proc = custom_proc
+      else
+        raise ArgumentError.new "Custom log context must be a Proc " \
+                                "which receives the job as an argument and " \
+                                "returns a hash"
+      end
+    end
+
+    def get_custom_log_context
+      self.class.log_context_proc&.call(@attrs) || {}
     end
 
     # This is accepting JOB_OPTIONS and args as keyword parameters. In future we want to

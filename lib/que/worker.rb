@@ -165,6 +165,8 @@ module Que
         @locker.with_locked_job do |job|
           return :job_not_found if job.nil?
 
+          klass = class_for(job[:job_class])
+
           log_keys = {
             priority: job["priority"],
             queue: job["queue"],
@@ -172,6 +174,7 @@ module Que
             job_class: job["job_class"],
             job_error_count: job["error_count"],
             que_job_id: job["job_id"],
+            **(klass.log_context_proc&.call(job) || {}),
           }
 
           labels = {
@@ -186,8 +189,6 @@ module Que
                 latency: job["latency"],
               )
             )
-
-            klass = class_for(job[:job_class])
 
             # Note the time spent waiting in the queue before being processed, and update
             # the jobs worked count here so that latency_seconds_total / worked_total

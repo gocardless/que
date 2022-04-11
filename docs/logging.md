@@ -31,6 +31,19 @@ Que.log :level => :debug, :my_output => 'my string'
 #=> D, [2014-01-12T05:16:15.221941 #5088] DEBUG -- : {"lib":"que","thread":24960,"my_output":"my string"}
 ```
 
+Que logs four type of events by default: `job_enqueued`, `job_begin`, `job_worked` and `job_error`. If you'd like to include custom keys in these events, you can do this by setting up a proc with `custom_log_context`. The proc receives the job attributes as an argument. Make sure that the proc returns a hash:
+
+```ruby
+  class ExampleJob
+    custom_log_context -> (attrs) {
+      {
+        currency: attrs[:args][0],
+        job_class: attrs[:job_class]
+      }
+    }
+  end
+```
+
 If you don't like JSON, you can also customize the format of the logging output by passing a callable object (such as a proc) to Que.log_formatter=. The proc should take a hash (the keys are symbols) and return a string. The keys and values are just as you would expect from the JSON output:
 
 ```ruby
