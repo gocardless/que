@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class ExceptionalJob < Que::Job
+class ExceptionalJob < Kent::Job
   @log = []
 
   class << self

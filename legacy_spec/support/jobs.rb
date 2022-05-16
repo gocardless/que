@@ -3,7 +3,7 @@
 # Common Job classes for use in specs.
 
 # Handy for blocking in the middle of processing a job.
-class BlockJob < Que::Job
+class BlockJob < Kent::Job
   def run
     $q1.push nil
     $q2.pop
@@ -16,7 +16,7 @@ end
 
 
 
-class ErrorJob < Que::Job
+class ErrorJob < Kent::Job
   def run
     raise "ErrorJob!"
   end
@@ -24,7 +24,7 @@ end
 
 
 
-class ArgsJob < Que::Job
+class ArgsJob < Kent::Job
   def run(*args)
     $passed_args = args
   end

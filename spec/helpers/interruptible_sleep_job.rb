@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class InterruptibleSleepJob < Que::Job
+class InterruptibleSleepJob < Kent::Job
   @log = []
 
   class << self

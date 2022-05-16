@@ -1,6 +1,6 @@
 source 'https://rubygems.org'
 
-gem 'que', path: '../..'
+gem 'kent', path: '../..'
 
 group :development, :test do
   gem 'rake'

@@ -1,6 +1,6 @@
 FROM ruby:3.0.2
-COPY . /que
-WORKDIR /que/benchmark
+COPY . /kent
+WORKDIR /kent/benchmark
 RUN bundle install
 EXPOSE 8080
-CMD ["/bin/bash", "/que/benchmark/start-worker"]
+CMD ["/bin/bash", "/kent/benchmark/start-worker"]

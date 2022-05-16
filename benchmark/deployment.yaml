@@ -2,18 +2,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: que-postgres
+  name: kent-postgres
   labels:
     app: postgres
 spec:
   replicas: 1
   selector:
     matchLabels:
-      name: que-postgres
+      name: kent-postgres
   template:
     metadata:
       labels:
-        name: que-postgres
+        name: kent-postgres
     spec:
       containers:
         - name: postgres
@@ -21,7 +21,7 @@ spec:
           imagePullPolicy: IfNotPresent
           args: ["-c", "max_locks_per_transaction=1024"]
           volumeMounts:
-            - name: que-postgres-init-scripts
+            - name: kent-postgres-init-scripts
               mountPath: /docker-entrypoint-initdb.d
           ports:
             - containerPort: 5432
@@ -34,7 +34,7 @@ spec:
             - name: POSTGRES_USER
               value: que
             - name: POSTGRES_DB
-              value: que-benchmark
+              value: kent-benchmark
             - name: POSTGRES_PASSWORD
               value: password
             - name: PGDATA
@@ -51,14 +51,14 @@ spec:
             successThreshold: 1
             timeoutSeconds: 5
       volumes:
-        - name: que-postgres-init-scripts
+        - name: kent-postgres-init-scripts
           configMap:
-            name: que-postgres-init-scripts
+            name: kent-postgres-init-scripts
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: que-postgres-init-scripts
+  name: kent-postgres-init-scripts
 data:
   structure.sql: |-
     CREATE TABLE public.que_jobs (
@@ -98,10 +98,10 @@ data:
 apiVersion: v1
 kind: Service
 metadata:
-  name: que-postgres
+  name: kent-postgres
 spec:
   selector:
-    name: que-postgres
+    name: kent-postgres
   ports:
     - protocol: TCP
       port: 5432
@@ -110,16 +110,16 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: que-benchmark
+  name: kent-benchmark
   labels:
     app: que
-    name: que-benchmark
+    name: kent-benchmark
 spec:
   replicas: 4
   selector:
     matchLabels:
       app: que
-      name: que-benchmark
+      name: kent-benchmark
   template:
     metadata:
       annotations:
@@ -127,11 +127,11 @@ spec:
         prometheus.io/port: "8080"
       labels:
         app: que
-        name: que-benchmark
+        name: kent-benchmark
     spec:
       containers:
         - name: worker
-          image: gocardless/que-benchmark:latest
+          image: gocardless/kent-benchmark:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -141,9 +141,9 @@ spec:
             - name: PGUSER
               value: que
             - name: PGDATABASE
-              value: que-benchmark
+              value: kent-benchmark
             - name: PGHOST
-              value: que-postgres
+              value: kent-postgres
             - name: PGPORT
               value: "5432"
             - name: PGPASSWORD

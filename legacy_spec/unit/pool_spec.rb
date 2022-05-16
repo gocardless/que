@@ -4,9 +4,9 @@ require 'spec_helper'
 
 describe "Managing the Worker pool" do
   it "should log mode changes" do
-    Que.mode = :sync
-    Que.mode = :off
-    Que.mode = :off
+    Kent.mode = :sync
+    Kent.mode = :off
+    Kent.mode = :off
 
     $logger.messages.count.should be 3
     m1, m2, m3 = $logger.messages.map { |m| JSON.load(m) }
@@ -21,199 +21,199 @@ describe "Managing the Worker pool" do
     m3['value'].should == 'off'
   end
 
-  describe "Que.mode=" do
+  describe "Kent.mode=" do
     describe ":off" do
       it "with worker_count 0 should not instantiate workers or hit the db" do
-        Que.connection = nil
-        Que.worker_count = 0
-        Que.mode = :off
-        Que::Worker.workers.should == []
+        Kent.connection = nil
+        Kent.worker_count = 0
+        Kent.mode = :off
+        Kent::Worker.workers.should == []
       end
 
       it "with worker_count > 0 should not instantiate workers or hit the db" do
-        Que.connection = nil
-        Que.mode = :off
-        Que.worker_count = 5
-        Que.mode = :off
-        Que::Worker.workers.should == []
+        Kent.connection = nil
+        Kent.mode = :off
+        Kent.worker_count = 5
+        Kent.mode = :off
+        Kent::Worker.workers.should == []
       end
     end
 
     describe ":sync" do
       it "with worker_count 0 should not instantiate workers or hit the db" do
-        Que.connection = nil
-        Que.worker_count = 0
-        Que.mode = :sync
-        Que::Worker.workers.should == []
+        Kent.connection = nil
+        Kent.worker_count = 0
+        Kent.mode = :sync
+        Kent::Worker.workers.should == []
       end
 
       it "with worker_count > 0 should not instantiate workers or hit the db" do
-        Que.connection = nil
-        Que.mode = :sync
-        Que.worker_count = 5
-        Que.mode = :sync
-        Que::Worker.workers.should == []
+        Kent.connection = nil
+        Kent.mode = :sync
+        Kent.worker_count = 5
+        Kent.mode = :sync
+        Kent::Worker.workers.should == []
       end
 
       it "should make jobs run in the same thread as they are queued" do
-        Que.mode = :sync
+        Kent.mode = :sync
 
         ArgsJob.enqueue(5, :testing => "synchronous").should be_an_instance_of ArgsJob
         $passed_args.should == [5, {"testing" => "synchronous"}]
-        DB[:que_jobs].count.should be 0
+        DB[:kent_jobs].count.should be 0
       end
 
       it "should work fine with enqueuing jobs without a DB connection" do
-        Que.connection = nil
-        Que.mode = :sync
+        Kent.connection = nil
+        Kent.mode = :sync
 
         ArgsJob.enqueue(5, :testing => "synchronous").should be_an_instance_of ArgsJob
         $passed_args.should == [5, {"testing" => "synchronous"}]
       end
 
       it "should not affect jobs that are queued with specific run_ats" do
-        Que.mode = :sync
+        Kent.mode = :sync
 
         ArgsJob.enqueue(5, :testing => "synchronous", :run_at => Time.now + 60)
-        DB[:que_jobs].select_map(:job_class).should == ["ArgsJob"]
+        DB[:kent_jobs].select_map(:job_class).should == ["ArgsJob"]
       end
     end
 
     describe ":async" do
       it "with worker_count 0 should not instantiate workers or hit the db" do
-        Que.connection = nil
-        Que.worker_count = 0
-        Que.mode = :async
-        Que::Worker.workers.map{|w| [w.state, w.thread.status]}.should == []
+        Kent.connection = nil
+        Kent.worker_count = 0
+        Kent.mode = :async
+        Kent::Worker.workers.map{|w| [w.state, w.thread.status]}.should == []
       end
 
       it "with worker_count > 0 should instantiate workers and hit the db" do
-        Que::Job.enqueue
-        Que.worker_count = 5
-        Que.mode = :async
-        sleep_until { Que::Worker.workers.all? &:sleeping? }
-        DB[:que_jobs].count.should == 0
-        Que::Worker.workers.map{|w| [w.state, w.thread.status]}.should == [[:sleeping, 'sleep']] * 5
+        Kent::Job.enqueue
+        Kent.worker_count = 5
+        Kent.mode = :async
+        sleep_until { Kent::Worker.workers.all? &:sleeping? }
+        DB[:kent_jobs].count.should == 0
+        Kent::Worker.workers.map{|w| [w.state, w.thread.status]}.should == [[:sleeping, 'sleep']] * 5
       end
 
-      it "should wake a worker every Que.wake_interval seconds" do
-        Que.worker_count = 4
-        Que.mode = :async
-        sleep_until { Que::Worker.workers.all? &:sleeping? }
-        Que.wake_interval = 0.01 # 10 ms
-        Que::Job.enqueue
-        sleep_until { DB[:que_jobs].count == 0 }
+      it "should wake a worker every Kent.wake_interval seconds" do
+        Kent.worker_count = 4
+        Kent.mode = :async
+        sleep_until { Kent::Worker.workers.all? &:sleeping? }
+        Kent.wake_interval = 0.01 # 10 ms
+        Kent::Job.enqueue
+        sleep_until { DB[:kent_jobs].count == 0 }
       end
 
-      it "should work jobs in the queue defined by the Que.queue_name config option" do
+      it "should work jobs in the queue defined by the Kent.queue_name config option" do
         begin
-          Que::Job.enqueue 1
-          Que::Job.enqueue 2, :queue => 'my_queue'
+          Kent::Job.enqueue 1
+          Kent::Job.enqueue 2, :queue => 'my_queue'
 
-          Que.queue_name = 'my_queue'
+          Kent.queue_name = 'my_queue'
 
-          Que.mode = :async
-          Que.worker_count = 2
+          Kent.mode = :async
+          Kent.worker_count = 2
 
-          sleep_until { Que::Worker.workers.all? &:sleeping? }
-          DB[:que_jobs].count.should be 1
+          sleep_until { Kent::Worker.workers.all? &:sleeping? }
+          DB[:kent_jobs].count.should be 1
 
-          job = DB[:que_jobs].first
+          job = DB[:kent_jobs].first
           job[:queue].should == ''
           job[:args].should == '[1]'
         ensure
-          Que.queue_name = nil
+          Kent.queue_name = nil
         end
       end
     end
   end
 
-  describe "Que.worker_count=" do
+  describe "Kent.worker_count=" do
     describe "when the mode is :off" do
       it "should record the setting but not instantiate any workers" do
-        Que.worker_count.should == 0
-        Que.connection = nil
-        Que.mode = :off
-        Que::Worker.workers.should == []
+        Kent.worker_count.should == 0
+        Kent.connection = nil
+        Kent.mode = :off
+        Kent::Worker.workers.should == []
 
-        Que.worker_count = 4
-        Que.worker_count.should == 4
-        Que::Worker.workers.should == []
+        Kent.worker_count = 4
+        Kent.worker_count.should == 4
+        Kent::Worker.workers.should == []
 
-        Que.worker_count = 6
-        Que.worker_count.should == 6
-        Que::Worker.workers.should == []
+        Kent.worker_count = 6
+        Kent.worker_count.should == 6
+        Kent::Worker.workers.should == []
 
-        Que.worker_count = 2
-        Que.worker_count.should == 2
-        Que::Worker.workers.should == []
+        Kent.worker_count = 2
+        Kent.worker_count.should == 2
+        Kent::Worker.workers.should == []
 
-        Que.worker_count = 0
-        Que.worker_count.should == 0
-        Que::Worker.workers.should == []
+        Kent.worker_count = 0
+        Kent.worker_count.should == 0
+        Kent::Worker.workers.should == []
       end
     end
 
     describe "when the mode is :sync" do
       it "should record the setting but not instantiate any workers" do
-        Que.worker_count.should == 0
-        Que.connection = nil
-        Que.mode = :sync
-        Que::Worker.workers.should == []
+        Kent.worker_count.should == 0
+        Kent.connection = nil
+        Kent.mode = :sync
+        Kent::Worker.workers.should == []
 
-        Que.worker_count = 4
-        Que.worker_count.should == 4
-        Que::Worker.workers.should == []
+        Kent.worker_count = 4
+        Kent.worker_count.should == 4
+        Kent::Worker.workers.should == []
 
-        Que.worker_count = 6
-        Que.worker_count.should == 6
-        Que::Worker.workers.should == []
+        Kent.worker_count = 6
+        Kent.worker_count.should == 6
+        Kent::Worker.workers.should == []
 
-        Que.worker_count = 2
-        Que.worker_count.should == 2
-        Que::Worker.workers.should == []
+        Kent.worker_count = 2
+        Kent.worker_count.should == 2
+        Kent::Worker.workers.should == []
 
-        Que.worker_count = 0
-        Que.worker_count.should == 0
-        Que::Worker.workers.should == []
+        Kent.worker_count = 0
+        Kent.worker_count.should == 0
+        Kent::Worker.workers.should == []
       end
     end
 
     describe "when the mode is :async" do
       it "should start hitting the DB when transitioning to a non-zero value" do
-        Que.mode = :async
-        Que::Job.enqueue
-        Que.worker_count = 4
-        sleep_until { Que::Worker.workers.all?(&:sleeping?) }
-        Que::Worker.workers.map{|w| [w.state, w.thread.status]}.should == [[:sleeping, 'sleep']] * 4
-        DB[:que_jobs].count.should == 0
+        Kent.mode = :async
+        Kent::Job.enqueue
+        Kent.worker_count = 4
+        sleep_until { Kent::Worker.workers.all?(&:sleeping?) }
+        Kent::Worker.workers.map{|w| [w.state, w.thread.status]}.should == [[:sleeping, 'sleep']] * 4
+        DB[:kent_jobs].count.should == 0
       end
 
       it "should stop hitting the DB when transitioning to zero" do
-        Que.mode = :async
-        Que.worker_count = 4
-        sleep_until { Que::Worker.workers.all?(&:sleeping?) }
-        Que.connection = nil
-        Que.worker_count = 0
+        Kent.mode = :async
+        Kent.worker_count = 4
+        sleep_until { Kent::Worker.workers.all?(&:sleeping?) }
+        Kent.connection = nil
+        Kent.worker_count = 0
         $logger.messages.map{|m| JSON.load(m).values_at('event', 'value')}.should ==
           [['mode_change', 'async'], ['worker_count_change', '4']] + [['job_unavailable', nil]] * 4 + [['worker_count_change', '0']]
       end
 
       it "should be able to scale down the number of workers gracefully" do
-        Que.mode = :async
-        Que.worker_count = 4
+        Kent.mode = :async
+        Kent.worker_count = 4
 
-        workers = Que::Worker.workers.dup
+        workers = Kent::Worker.workers.dup
         workers.count.should be 4
-        sleep_until { Que::Worker.workers.all?(&:sleeping?) }
+        sleep_until { Kent::Worker.workers.all?(&:sleeping?) }
 
-        Que.worker_count = 2
-        Que::Worker.workers.count.should be 2
-        sleep_until { Que::Worker.workers.all?(&:sleeping?) }
+        Kent.worker_count = 2
+        Kent::Worker.workers.count.should be 2
+        sleep_until { Kent::Worker.workers.all?(&:sleeping?) }
 
-        workers[0..1].should == Que::Worker.workers
+        workers[0..1].should == Kent::Worker.workers
         workers[2..3].each do |worker|
-          worker.should be_an_instance_of Que::Worker
+          worker.should be_an_instance_of Kent::Worker
           worker.thread.status.should == false
         end
 
@@ -222,17 +222,17 @@ describe "Managing the Worker pool" do
       end
 
       it "should be able to scale up the number of workers gracefully" do
-        Que.mode = :async
-        Que.worker_count = 4
-        workers = Que::Worker.workers.dup
+        Kent.mode = :async
+        Kent.worker_count = 4
+        workers = Kent::Worker.workers.dup
         workers.count.should be 4
 
-        sleep_until { Que::Worker.workers.all?(&:sleeping?) }
-        Que.worker_count = 6
-        Que::Worker.workers.count.should be 6
-        sleep_until { Que::Worker.workers.all?(&:sleeping?) }
+        sleep_until { Kent::Worker.workers.all?(&:sleeping?) }
+        Kent.worker_count = 6
+        Kent::Worker.workers.count.should be 6
+        sleep_until { Kent::Worker.workers.all?(&:sleeping?) }
 
-        workers.should == Que::Worker.workers[0..3]
+        workers.should == Kent::Worker.workers[0..3]
 
         $logger.messages.map{|m| JSON.load(m).values_at('event', 'value')}.should ==
           [['mode_change', 'async'], ['worker_count_change', '4']] + [['job_unavailable', nil]] * 4 + [['worker_count_change', '6']] + [['job_unavailable', nil]] * 2
@@ -240,125 +240,125 @@ describe "Managing the Worker pool" do
     end
   end
 
-  describe "Que.wake!" do
+  describe "Kent.wake!" do
     it "when mode = :off should do nothing" do
-      Que.connection = nil
-      Que.mode = :off
-      Que.worker_count = 4
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
-      Que.wake!
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
+      Kent.connection = nil
+      Kent.mode = :off
+      Kent.worker_count = 4
+      sleep_until { Kent::Worker.workers.all? &:sleeping? }
+      Kent.wake!
+      sleep_until { Kent::Worker.workers.all? &:sleeping? }
       $logger.messages.map{|m| JSON.load(m).values_at('event', 'value')}.should ==
         [['mode_change', 'off'], ['worker_count_change', '4']]
     end
 
     it "when mode = :sync should do nothing" do
-      Que.connection = nil
-      Que.mode = :sync
-      Que.worker_count = 4
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
-      Que.wake!
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
+      Kent.connection = nil
+      Kent.mode = :sync
+      Kent.worker_count = 4
+      sleep_until { Kent::Worker.workers.all? &:sleeping? }
+      Kent.wake!
+      sleep_until { Kent::Worker.workers.all? &:sleeping? }
       $logger.messages.map{|m| JSON.load(m).values_at('event', 'value')}.should ==
         [['mode_change', 'sync'], ['worker_count_change', '4']]
     end
 
     it "when mode = :async and worker_count = 0 should do nothing" do
-      Que.connection = nil
-      Que.mode = :async
-      Que.worker_count = 0
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
-      Que.wake!
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
+      Kent.connection = nil
+      Kent.mode = :async
+      Kent.worker_count = 0
+      sleep_until { Kent::Worker.workers.all? &:sleeping? }
+      Kent.wake!
+      sleep_until { Kent::Worker.workers.all? &:sleeping? }
       $logger.messages.map{|m| JSON.load(m).values_at('event', 'value')}.should ==
         [['mode_change', 'async'], ['worker_count_change', '0']]
     end
 
     it "when mode = :async and worker_count > 0 should wake up a single worker" do
-      Que.mode = :async
-      Que.worker_count = 4
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
+      Kent.mode = :async
+      Kent.worker_count = 4
+      sleep_until { Kent::Worker.workers.all? &:sleeping? }
 
       BlockJob.enqueue
-      Que.wake!
+      Kent.wake!
 
       $q1.pop
-      Que::Worker.workers.first.should be_working
-      Que::Worker.workers[1..3].each { |w| w.should be_sleeping }
-      DB[:que_jobs].count.should be 1
+      Kent::Worker.workers.first.should be_working
+      Kent::Worker.workers[1..3].each { |w| w.should be_sleeping }
+      DB[:kent_jobs].count.should be 1
       $q2.push nil
 
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
-      DB[:que_jobs].count.should be 0
+      sleep_until { Kent::Worker.workers.all? &:sleeping? }
+      DB[:kent_jobs].count.should be 0
     end
 
     it "when mode = :async and worker_count > 0 should be thread-safe" do
-      Que.mode = :async
-      Que.worker_count = 4
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
-      threads = 4.times.map { Thread.new { 100.times { Que.wake! } } }
+      Kent.mode = :async
+      Kent.worker_count = 4
+      sleep_until { Kent::Worker.workers.all? &:sleeping? }
+      threads = 4.times.map { Thread.new { 100.times { Kent.wake! } } }
       threads.each(&:join)
     end
   end
 
-  describe "Que.wake_all!" do
+  describe "Kent.wake_all!" do
     it "when mode = :off should do nothing" do
-      Que.connection = nil
-      Que.mode = :off
-      Que.worker_count = 4
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
-      Que.wake_all!
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
+      Kent.connection = nil
+      Kent.mode = :off
+      Kent.worker_count = 4
+      sleep_until { Kent::Worker.workers.all? &:sleeping? }
+      Kent.wake_all!
+      sleep_until { Kent::Worker.workers.all? &:sleeping? }
       $logger.messages.map{|m| JSON.load(m).values_at('event', 'value')}.should ==
         [['mode_change', 'off'], ['worker_count_change', '4']]
     end
 
     it "when mode = :sync should do nothing" do
-      Que.connection = nil
-      Que.mode = :sync
-      Que.worker_count = 4
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
-      Que.wake_all!
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
+      Kent.connection = nil
+      Kent.mode = :sync
+      Kent.worker_count = 4
+      sleep_until { Kent::Worker.workers.all? &:sleeping? }
+      Kent.wake_all!
+      sleep_until { Kent::Worker.workers.all? &:sleeping? }
       $logger.messages.map{|m| JSON.load(m).values_at('event', 'value')}.should ==
         [['mode_change', 'sync'], ['worker_count_change', '4']]
     end
 
     it "when mode = :async and worker_count = 0 should do nothing" do
-      Que.connection = nil
-      Que.mode = :async
-      Que.worker_count = 0
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
-      Que.wake_all!
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
+      Kent.connection = nil
+      Kent.mode = :async
+      Kent.worker_count = 0
+      sleep_until { Kent::Worker.workers.all? &:sleeping? }
+      Kent.wake_all!
+      sleep_until { Kent::Worker.workers.all? &:sleeping? }
       $logger.messages.map{|m| JSON.load(m).values_at('event', 'value')}.should ==
         [['mode_change', 'async'], ['worker_count_change', '0']]
     end
 
     # This spec requires at least four connections.
     it "when mode = :async and worker_count > 0 should wake up all workers" do
-      Que.adapter = QUE_ADAPTERS[:pond]
+      Kent.adapter = KENT_ADAPTERS[:pond]
 
-      Que.mode = :async
-      Que.worker_count = 4
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
+      Kent.mode = :async
+      Kent.worker_count = 4
+      sleep_until { Kent::Worker.workers.all? &:sleeping? }
 
       4.times { BlockJob.enqueue }
-      Que.wake_all!
+      Kent.wake_all!
       4.times { $q1.pop }
 
-      Que::Worker.workers.each{ |worker| worker.should be_working }
+      Kent::Worker.workers.each{ |worker| worker.should be_working }
       4.times { $q2.push nil }
 
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
-      DB[:que_jobs].count.should be 0
-    end if QUE_ADAPTERS[:pond]
+      sleep_until { Kent::Worker.workers.all? &:sleeping? }
+      DB[:kent_jobs].count.should be 0
+    end if KENT_ADAPTERS[:pond]
 
     it "when mode = :async and worker_count > 0 should be thread-safe" do
-      Que.mode = :async
-      Que.worker_count = 4
-      sleep_until { Que::Worker.workers.all? &:sleeping? }
-      threads = 4.times.map { Thread.new { 100.times { Que.wake_all! } } }
+      Kent.mode = :async
+      Kent.worker_count = 4
+      sleep_until { Kent::Worker.workers.all? &:sleeping? }
+      threads = 4.times.map { Thread.new { 100.times { Kent.wake_all! } } }
       threads.each(&:join)
     end
   end

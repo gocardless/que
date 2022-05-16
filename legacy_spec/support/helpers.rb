@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 # Helper for testing threaded code.
-QUE_TEST_TIMEOUT ||= 2
-def sleep_until(timeout = QUE_TEST_TIMEOUT)
+KENT_TEST_TIMEOUT ||= 2
+def sleep_until(timeout = KENT_TEST_TIMEOUT)
   deadline = Time.now + timeout
   loop do
     break if yield

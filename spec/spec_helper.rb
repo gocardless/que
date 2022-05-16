@@ -2,14 +2,14 @@
 
 $LOAD_PATH << File.expand_path(__FILE__, "../lib")
 
-require "que"
+require "kent"
 require "rspec"
 require "active_record"
 
 require_relative "./helpers/create_user"
 require_relative "./helpers/exceptional_job"
 require_relative "./helpers/fake_job"
-require_relative "./helpers/que_job"
+require_relative "./helpers/kent_job"
 require_relative "./helpers/sleep_job"
 require_relative "./helpers/interruptible_sleep_job"
 require_relative "./helpers/user"
@@ -24,22 +24,22 @@ def establish_database_connection
     host: ENV.fetch("PGHOST", "localhost"),
     user: ENV.fetch("PGUSER", "postgres"),
     password: ENV.fetch("PGPASSWORD", ""),
-    database: ENV.fetch("PGDATABASE", "que-test"),
+    database: ENV.fetch("PGDATABASE", "kent-test"),
   )
 end
 
 establish_database_connection
 
-# Make sure our test database is prepared to run Que
-Que.connection = ActiveRecord
-Que.migrate!
+# Make sure our test database is prepared to run Kent
+Kent.connection = ActiveRecord
+Kent.migrate!
 
 # Ensure we have a logger, so that we can test the code paths that log
-Que.logger = Logger.new("/dev/null")
+Kent.logger = Logger.new("/dev/null")
 
 RSpec.configure do |config|
   config.before do
-    QueJob.delete_all
+    KentJob.delete_all
     FakeJob.log = []
     ExceptionalJob.log = []
     ExceptionalJob::WithFailureHandler.log = []

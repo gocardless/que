@@ -13,30 +13,30 @@ references:
 
   cache_bundle: &cache_bundle
     save_cache:
-      key: bundle-<< parameters.ruby_version >>-{{ checksum "que.gemspec" }}-{{ checksum "Gemfile" }}
+      key: bundle-<< parameters.ruby_version >>-{{ checksum "kent.gemspec" }}-{{ checksum "Gemfile" }}
       paths:
         - vendor/bundle
 
   restore_bundle: &restore_bundle
     restore_cache:
-      key: bundle-<< parameters.ruby_version >>-{{ checksum "que.gemspec" }}-{{ checksum "Gemfile" }}
+      key: bundle-<< parameters.ruby_version >>-{{ checksum "kent.gemspec" }}-{{ checksum "Gemfile" }}
 
 jobs:
   rspec:
-    working_directory: ~/que
+    working_directory: ~/kent
     parameters:
       ruby_version:
         type: string
     docker:
       - image: cimg/ruby:<< parameters.ruby_version >>
         environment:
-          PGDATABASE: que-test
+          PGDATABASE: kent-test
           PGUSER: ubuntu
           PGPASSWORD: password
           PGHOST: localhost
       - image: postgres:11.2
         environment:
-          POSTGRES_DB: que-test
+          POSTGRES_DB: kent-test
           POSTGRES_USER: ubuntu
           POSTGRES_PASSWORD: password
     steps:

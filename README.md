@@ -30,7 +30,7 @@ Que is tested on Ruby 2.0, Rubinius and JRuby (with the `jruby-pg` gem, which is
 
 Add this line to your application's Gemfile:
 
-    gem 'que'
+    gem 'kent'
 
 And then execute:
 

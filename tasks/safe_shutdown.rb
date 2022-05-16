@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# This task is used to test Que's behavior when its process is shut down.
+# This task is used to test Kent's behavior when its process is shut down.
 
 # The situation we're trying to avoid occurs when the process dies while a job
 # is in the middle of a transaction - ideally, the transaction would be rolled
@@ -11,32 +11,32 @@
 
 # So, this task opens a transaction within a job, makes a write, then prompts
 # you to kill it with one of a few signals. You can then run it again to make
-# sure that the write was rolled back (if it wasn't, Que isn't functioning
+# sure that the write was rolled back (if it wasn't, Kent isn't functioning
 # like it should). This task only explicitly tests Sequel, but the behavior
 # for ActiveRecord is very similar.
 
 # rubocop:disable Style/GlobalVars
 task :safe_shutdown do
   require "sequel"
-  require "que"
+  require "kent"
 
   url = ENV["DATABASE_URL"] || "postgres://postgres:@localhost/que-test"
   DB = Sequel.connect(url)
 
-  if DB.table_exists?(:que_jobs)
-    puts "Uh-oh! Previous shutdown wasn't clean!" if DB[:que_jobs].where(job_id: 0).exists
-    DB.drop_table :que_jobs
+  if DB.table_exists?(:kent_jobs)
+    puts "Uh-oh! Previous shutdown wasn't clean!" if DB[:kent_jobs].where(job_id: 0).exists
+    DB.drop_table :kent_jobs
   end
 
-  Que.connection = DB
-  Que.create!
+  Kent.connection = DB
+  Kent.create!
 
   $queue = Queue.new
 
-  class SafeJob < Que::Job
+  class SafeJob < Kent::Job
     def run
       DB.transaction do
-        DB[:que_jobs].insert(job_id: 0, job_class: "Que::Job")
+        DB[:kent_jobs].insert(job_id: 0, job_class: "Kent::Job")
         $queue.push nil
         sleep
       end
@@ -44,7 +44,7 @@ task :safe_shutdown do
   end
 
   SafeJob.enqueue
-  Que.mode = :async
+  Kent.mode = :async
   $queue.pop
 
   puts "From a different terminal window, run one of the following:"
@@ -56,9 +56,9 @@ task :safe_shutdown do
   trap("INT") { stop = true }
 
   at_exit do
-    $stdout.puts "Finishing Que's current jobs before exiting..."
-    Que.mode = :off
-    $stdout.puts "Que's jobs finished, exiting..."
+    $stdout.puts "Finishing Kent's current jobs before exiting..."
+    Kent.mode = :off
+    $stdout.puts "Kent's jobs finished, exiting..."
   end
 
   loop do

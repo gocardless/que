@@ -11,10 +11,10 @@ Dir['./spec/support/**/*.rb'].sort.each &method(:require)
 
 
 # Handy constants for initializing PG connections:
-QUE_URL = ENV['DATABASE_URL'] || 'postgres://postgres:@localhost/que-test'
+KENT_URL = ENV['DATABASE_URL'] || 'postgres://postgres:@localhost/que-test'
 
 NEW_PG_CONNECTION = proc do
-  uri = URI.parse(QUE_URL)
+  uri = URI.parse(KENT_URL)
   pg = PG::Connection.open :host     => uri.host,
                            :user     => uri.user,
                            :password => uri.password,
@@ -29,32 +29,33 @@ end
 
 
 # Adapters track which statements have been prepared for their connections,
-# and if Que.connection= is called before each spec, we're constantly creating
+# and if Kent.connection= is called before each spec, we're constantly creating
 # new adapters and losing that information, which is bad. So instead, we hang
-# onto a few adapters and assign them using Que.adapter= as needed. The plain
+# onto a few adapters and assign them using Kent.adapter= as needed. The plain
 # pg adapter is the default.
 
-# Also, let Que initialize the adapter itself, to make sure that the
+# Also, let Kent initialize the adapter itself, to make sure that the
 # recognition logic works. Similar code can be found in the adapter specs.
-Que.connection = NEW_PG_CONNECTION.call
-QUE_ADAPTERS = {:pg => Que.adapter}
+Kent.connection = NEW_PG_CONNECTION.call
+KENT_ADAPTERS = {:pg => Kent.adapter}
 
 
 
 # We use Sequel to examine the database in specs.
 require 'sequel'
-DB = Sequel.connect(QUE_URL)
+DB = Sequel.connect(KENT_URL)
 
 
 
 # Reset the table to the most up-to-date version.
 DB.drop_table? :que_jobs
-Que::Migrations.migrate!
+DB.drop_table? :kent_jobs
+Kent::Migrations.migrate!
 
 
 
 # Set up a dummy logger.
-Que.logger = $logger = Object.new
+Kent.logger = $logger = Object.new
 $logger_mutex = Mutex.new # Protect against rare errors on Rubinius/JRuby.
 
 def $logger.messages
@@ -94,19 +95,19 @@ RSpec.configure do |config|
     # helpful in identifying hanging specs.
     stdout.info "Running spec: #{desc} @ #{line}" if ENV['LOG_SPEC']
 
-    Que.adapter = QUE_ADAPTERS[:pg]
+    Kent.adapter = KENT_ADAPTERS[:pg]
 
-    Que.worker_count = 0
-    Que.mode = :async
-    Que.wake_interval = nil
+    Kent.worker_count = 0
+    Kent.mode = :async
+    Kent.wake_interval = nil
 
     $logger.messages.clear
 
     spec.run
 
-    Que.worker_count = 0
-    Que.mode = :off
-    Que.wake_interval = nil
+    Kent.worker_count = 0
+    Kent.mode = :off
+    Kent.wake_interval = nil
 
     DB[:que_jobs].delete
 

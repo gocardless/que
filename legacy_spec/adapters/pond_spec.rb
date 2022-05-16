@@ -3,19 +3,19 @@
 require 'spec_helper'
 require 'pond'
 
-Que.connection = QUE_SPEC_POND = Pond.new &NEW_PG_CONNECTION
-QUE_ADAPTERS[:pond] = Que.adapter
+Kent.connection = KENT_SPEC_POND = Pond.new &NEW_PG_CONNECTION
+KENT_ADAPTERS[:pond] = Kent.adapter
 
-describe "Que using the Pond adapter" do
-  before { Que.adapter = QUE_ADAPTERS[:pond] }
+describe "Kent using the Pond adapter" do
+  before { Kent.adapter = KENT_ADAPTERS[:pond] }
 
-  it_behaves_like "a multi-threaded Que adapter"
+  it_behaves_like "a multi-threaded Kent adapter"
 
   it "should be able to tell when it's already in a transaction" do
-    Que.adapter.should_not be_in_transaction
-    QUE_SPEC_POND.checkout do |conn|
+    Kent.adapter.should_not be_in_transaction
+    KENT_SPEC_POND.checkout do |conn|
       conn.async_exec "BEGIN"
-      Que.adapter.should be_in_transaction
+      Kent.adapter.should be_in_transaction
       conn.async_exec "COMMIT"
     end
   end
