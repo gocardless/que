@@ -1,3 +1,9 @@
+# 🚨 This fork is now deprecated 🚨
+
+The original intent of the fork was to implement some features that were not accepted into the mainline [que](https://github.com/que-rb/que) and has diverged significantly from the original implementation. We're looking to contribute these features into the original gem and deprecate this one.
+
+We'll be deprecating the use of this repository internally and in time migrating to the original
+
 # Que
 
 **TL;DR: Que is a high-performance alternative to DelayedJob or QueueClassic that improves the reliability of your application by protecting your jobs with the same [ACID guarantees](https://en.wikipedia.org/wiki/ACID) as the rest of your data.**
