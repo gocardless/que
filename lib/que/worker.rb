@@ -145,7 +145,7 @@ module Que
         loop do
           case event = work
           when :job_not_found, :postgres_error
-            Que.logger&.info(event: "que.#{event}", wake_interval: @wake_interval)
+            Que.logger&.info(event: -+"que.#{event}", wake_interval: @wake_interval)
             @tracer.trace(SleepingSecondsTotal, queue: @queue) { sleep(@wake_interval) }
           when :job_worked
             nil # immediately find a new job to work
@@ -158,8 +158,6 @@ module Que
       @stopped = true
     end
 
-    # rubocop:disable Metrics/MethodLength
-    # rubocop:disable Metrics/AbcSize
     def work
       Que.adapter.checkout do
         @locker.with_locked_job do |job|
@@ -243,8 +241,6 @@ module Que
       # the work loop. Instead, we should let the work loop sleep and retry.
       :postgres_error
     end
-    # rubocop:enable Metrics/MethodLength
-    # rubocop:enable Metrics/AbcSize
 
     def stop!
       @stop = true
