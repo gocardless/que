@@ -1,8 +1,6 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# frozen_string_literal: true
-
 require "logger"
 require "optparse"
 require "ostruct"
@@ -49,6 +47,20 @@ OptionParser.new do |opts|
 
   opts.on("-q", "--queue-name [NAME]", String, "Set the name of the queue to work jobs from (default: default)") do |queue_name|
     options.queue_name = queue_name
+  end
+
+  opts.on("--weighted-queue high_priority_queue[90],low_priority_queue[10]", Array, "Sets the weighing to use for multiple queue comsumption") do |weighted_queue|
+    require 'pry'
+    mapped = weighted_queue.map do |queue|
+      value, weight = queue.match(/(\w+)\[([0-9]?[0-9]+)\]/).captures
+
+      raise "queue_name not found" unless value
+      raise "weight not found" unless weight
+
+      { weight: weight.to_i, value: value }
+    end
+
+    options.weighted_queue = mapped
   end
 
   opts.on("--timeout [TIMEOUT]", Float, "Set the duration (in seconds) to wait, after receiving SIGTERM/SIGINT, for workers to finish before forcing them to stop") do |timeout|
@@ -107,14 +119,38 @@ def wait_for_signals(*signals, sleep_interval: 1)
   sleep(sleep_interval) until received_signal
 end
 
-worker_group = Que::WorkerGroup.start(
-  worker_count,
-  queue: queue_name,
-  wake_interval: wake_interval,
-  lock_cursor_expiry: cursor_expiry,
-  lock_window: options.lock_window,
-  lock_budget: options.lock_budget,
-)
+if opts.weighted_queue
+  Que.logger&.info(
+    event: "que_mode",
+    msg: "Running multiple queues",
+    port: options.metrics_port,
+    weighted_queue: opts.weighted_queue
+  )
+  worker_group = Que::WorkerGroup.start(
+    worker_count,
+    Que::RandomWoker,
+    weighted_queue: opts.weighted_queue,
+    wake_interval: wake_interval,
+    lock_cursor_expiry: cursor_expiry,
+    lock_window: options.lock_window,
+    lock_budget: options.lock_budget,
+  )
+else
+  Que.logger&.info(
+    event: "que_mode",
+    msg: "Running single queues",
+    port: options.metrics_port,
+    queue: queue_name,
+  )
+  worker_group = Que::WorkerGroup.start(
+    worker_count,
+    queue: queue_name,
+    wake_interval: wake_interval,
+    lock_cursor_expiry: cursor_expiry,
+    lock_window: options.lock_window,
+    lock_budget: options.lock_budget,
+  )
+end
 
 if options.metrics_port
   Thread.new do

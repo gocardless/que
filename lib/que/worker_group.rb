@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "worker"
+require_relative "random_worker"
 
 module Que
   class WorkerGroup
@@ -17,14 +18,15 @@ module Que
       ),
     ].freeze
 
-    def self.start(count, **kwargs)
+    def self.start(count, worker_class = Que::Worker, **kwargs)
       Que.logger.info(
         msg: "Starting workers",
         event: "que.worker.start",
         worker_count: count,
+        worker_class: worker_class,
       )
 
-      workers = Array.new(count) { Worker.new(**kwargs) }
+      workers = Array.new(count) { worker_class.new(**kwargs) }
       worker_threads = workers.map { |worker| Thread.new { worker.work_loop } }
 
       # We want to ensure that our control flow for Que threads and our metric endpoints
