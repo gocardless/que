@@ -165,8 +165,6 @@ module Que
         @locker.with_locked_job do |job|
           return :job_not_found if job.nil?
 
-          klass = class_for(job[:job_class])
-
           log_keys = {
             priority: job["priority"],
             queue: job["queue"],
@@ -174,7 +172,6 @@ module Que
             job_class: job["job_class"],
             job_error_count: job["error_count"],
             que_job_id: job["job_id"],
-            **(klass.log_context_proc&.call(job) || {}),
           }
 
           labels = {
@@ -182,6 +179,12 @@ module Que
           }
 
           begin
+            klass = class_for(job[:job_class])
+
+            log_keys.merge!(
+              (klass.log_context_proc&.call(job) || {}),
+            )
+
             Que.logger&.info(
               log_keys.merge(
                 event: "que_job.job_begin",
@@ -229,7 +232,7 @@ module Que
 
             # For compatibility with que-failure, we need to allow failure handlers to be
             # defined on the job class.
-            if klass.respond_to?(:handle_job_failure)
+            if klass&.respond_to?(:handle_job_failure)
               klass.handle_job_failure(error, job)
             else
               handle_job_failure(error, job)

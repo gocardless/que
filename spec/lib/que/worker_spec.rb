@@ -175,6 +175,28 @@ RSpec.describe Que::Worker do
         end
       end
 
+      context "when the job is no longer defined" do
+        it "marks it as failed" do
+          job_options = {
+            queue: "default",
+            priority: 1,
+            run_at: nil,
+            job_class: "JobNotFound",
+            retryable: true,
+          }
+
+          Que.adapter.execute(:insert_job, [*job_options.values_at(*Que::Job::JOB_OPTIONS), []])
+
+          expect(subject).to eq(:job_worked)
+
+          job = QueJob.first
+
+          expect(job.error_count).to eq(1)
+          expect(job.run_at).to be > postgres_now
+          expect(job.last_error).to match("uninitialized constant JobNotFound")
+        end
+      end
+
       context "when postgres raises an exception while processing a job" do
         it "rescues it and returns an error" do
           FakeJob.enqueue(1)
