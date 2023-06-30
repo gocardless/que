@@ -1,8 +1,6 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# frozen_string_literal: true
-
 require "logger"
 require "optparse"
 require "ostruct"
@@ -53,6 +51,10 @@ OptionParser.new do |opts|
 
   opts.on("--timeout [TIMEOUT]", Float, "Set the duration (in seconds) to wait, after receiving SIGTERM/SIGINT, for workers to finish before forcing them to stop") do |timeout|
     options.timeout = timeout
+  end
+
+  opts.on("--permissive [BOOL]", FalseClass, "Flag to determine if this worker should only aquire work from its specified queue or simply priorisize it (default: false)") do |permissive|
+    options.permissive = permissive
   end
 
   opts.on("-v", "--version", "Show Que version") do
@@ -107,6 +109,8 @@ def wait_for_signals(*signals, sleep_interval: 1)
   sleep(sleep_interval) until received_signal
 end
 
+queue_selection = options.permissive ? "permissive" : "exclusive"
+
 worker_group = Que::WorkerGroup.start(
   worker_count,
   queue: queue_name,
@@ -114,6 +118,7 @@ worker_group = Que::WorkerGroup.start(
   lock_cursor_expiry: cursor_expiry,
   lock_window: options.lock_window,
   lock_budget: options.lock_budget,
+  queue_selection: queue_selection,
 )
 
 if options.metrics_port

@@ -120,7 +120,8 @@ module Que
       wake_interval: DEFAULT_WAKE_INTERVAL,
       lock_cursor_expiry: DEFAULT_WAKE_INTERVAL,
       lock_window: nil,
-      lock_budget: nil
+      lock_budget: nil,
+      queue_selection_strategy: "exclusive"
     )
       @queue = queue
       @wake_interval = wake_interval
@@ -133,6 +134,7 @@ module Que
         cursor_expiry: lock_cursor_expiry,
         window: lock_window,
         budget: lock_budget,
+        queue_selection_strategy: queue_selection_strategy,
       )
     end
 

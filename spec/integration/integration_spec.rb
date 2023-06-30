@@ -4,8 +4,12 @@ require "spec_helper"
 require "que/worker" # required to prevent autoload races
 
 RSpec.describe "multiple workers" do
-  def with_workers(num, stop_timeout: 5)
-    Que::WorkerGroup.start(num, wake_interval: 0.01).tap { yield }.stop(stop_timeout)
+  def with_workers(num, stop_timeout: 5, queue_selection_strategy: "exclusive")
+    Que::WorkerGroup.start(
+      num,
+      wake_interval: 0.01,
+      queue_selection_strategy: queue_selection_strategy
+    ).tap { yield }.stop(stop_timeout)
   end
 
   # Wait for a maximum of [timeout] seconds for all jobs to be worked
@@ -28,6 +32,38 @@ RSpec.describe "multiple workers" do
 
       expect(QueJob.count).to eq(0)
       expect(FakeJob.log.count).to eq(10)
+    end
+  end
+
+  context "with a job on a non default queue" do
+    context "with exclusive workers" do
+      it "does not work the job on the non-default queue" do
+        FakeJob.enqueue(1, queue: "default")
+        FakeJob.enqueue(2, queue: "non-default")
+
+        expect(QueJob.count).to eq(2)
+
+        with_workers(1) { wait_for_jobs_to_be_worked(timeout: 1) }
+
+        expect(QueJob.count).to eq(1)
+        expect(FakeJob.log.count).to eq(1)
+      end
+    end
+
+    context "with permissive workers" do
+      it "works each job exactly once" do
+        FakeJob.enqueue(1, queue: "default")
+        FakeJob.enqueue(2, queue: "non-default")
+
+        expect(QueJob.count).to eq(2)
+
+        with_workers(1, queue_selection_strategy: "permissive") do
+          wait_for_jobs_to_be_worked(timeout: 1)
+        end
+
+        expect(QueJob.count).to eq(0)
+        expect(FakeJob.log.count).to eq(2)
+      end
     end
   end
 

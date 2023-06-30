@@ -53,11 +53,12 @@ module Que
       ),
     ].freeze
 
-    def initialize(queue:, cursor_expiry:, window: nil, budget: nil)
+    def initialize(queue:, cursor_expiry:, window: nil, budget: nil, queue_selection_strategy: "exclusive")
       @queue = queue
       @cursor_expiry = cursor_expiry
       @cursor = 0
       @cursor_expires_at = monotonic_now
+      @queue_selection_strategy = queue_selection_strategy
 
       # Create a bucket that has 100% capacity, so even when we don't apply a limit we
       # have a valid bucket that we can use everywhere
@@ -125,13 +126,24 @@ module Que
     def execute_lock_job
       strategy = @cursor.zero? ? "full" : "cursor"
       observe(AcquireTotal, AcquireSecondsTotal, strategy: strategy) do
-        Que.execute(:lock_job, [@queue, @cursor]).first
+        Que.execute(lock_job_query, [@queue, @cursor]).first
       end
     end
 
     def exists?(job)
       observe(ExistsTotal, ExistsSecondsTotal) do
         Que.execute(:check_job, job.values_at(*Job::JOB_INSTANCE_FIELDS)).any? if job
+      end
+    end
+
+    def lock_job_query
+      case @queue_selection_strategy
+      when "exclusive"
+        :lock_job
+      when "permissive"
+        :queue_permissive_lock_job
+      else
+        raise "Unexpected queue_selection_strategy=#{@queue_selection_strategy}"
       end
     end
 
