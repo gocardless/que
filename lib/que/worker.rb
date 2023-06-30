@@ -144,8 +144,11 @@ module Que
       @tracer.trace(RunningSecondsTotal, queue: @queue) do
         loop do
           case event = work
-          when :job_not_found, :postgres_error
-            Que.logger&.info(event: "que.#{event}", wake_interval: @wake_interval)
+          when :postgres_error
+            Que.logger&.info(event: "que.postgres_error", wake_interval: @wake_interval)
+            @tracer.trace(SleepingSecondsTotal, queue: @queue) { sleep(@wake_interval) }
+          when :job_not_found
+            Que.logger&.debug(event: "que.job_not_found", wake_interval: @wake_interval)
             @tracer.trace(SleepingSecondsTotal, queue: @queue) { sleep(@wake_interval) }
           when :job_worked
             nil # immediately find a new job to work
