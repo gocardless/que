@@ -53,7 +53,7 @@ OptionParser.new do |opts|
     options.timeout = timeout
   end
 
-  opts.on("--secondary-queues high_priority_queue,low_priority_queue", Array, "Sets the queues to poll for multiple queue comsumption") do |_queues|
+  opts.on("--secondary-queues high_priority_queue,low_priority_queue", Array, "Sets the queues to poll for multiple queue consumption") do |secondary_queues|
     options.secondary_queues = secondary_queues
   end
 
