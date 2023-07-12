@@ -85,9 +85,7 @@ module Que
     },
 
     # instead of keeping this worker in a exclusivee queue mode let it take work
-    # from ANY other queues with work availble.
-    #
-    # Possible extensions to this could be to introduce a priority list.
+    # from defined secondary_queues with work availble.
     queue_permissive_lock_job: %{
       WITH RECURSIVE jobs AS (
         SELECT (j).*, pg_try_advisory_lock((j).job_id) AS locked
@@ -95,6 +93,7 @@ module Que
           SELECT j
           FROM que_jobs AS j
           WHERE job_id >= $2
+          AND (queue = $1::text OR queue = ANY($3::text[]))
           AND run_at <= now()
           AND retryable = true
           ORDER BY
@@ -111,6 +110,7 @@ module Que
               SELECT j
               FROM que_jobs AS j
               WHERE run_at <= now()
+              AND (queue = $1::text OR queue = ANY($3::text[]))
               AND retryable = true
               AND (priority, run_at, job_id) > (jobs.priority, jobs.run_at, jobs.job_id)
               ORDER BY

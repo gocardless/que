@@ -121,7 +121,7 @@ module Que
       lock_cursor_expiry: DEFAULT_WAKE_INTERVAL,
       lock_window: nil,
       lock_budget: nil,
-      queue_selection_strategy: "exclusive"
+      secondary_queues: []
     )
       @queue = queue
       @wake_interval = wake_interval
@@ -134,7 +134,7 @@ module Que
         cursor_expiry: lock_cursor_expiry,
         window: lock_window,
         budget: lock_budget,
-        queue_selection_strategy: queue_selection_strategy,
+        secondary_queues: secondary_queues,
       )
     end
 
@@ -163,8 +163,6 @@ module Que
       @stopped = true
     end
 
-    # rubocop:disable Metrics/MethodLength
-    # rubocop:disable Metrics/AbcSize
     def work
       Que.adapter.checkout do
         @locker.with_locked_job do |job|
@@ -195,7 +193,7 @@ module Que
                 event: "que_job.job_begin",
                 msg: "Job acquired, beginning work",
                 latency: job["latency"],
-              )
+              ),
             )
 
             # Note the time spent waiting in the queue before being processed, and update
@@ -223,37 +221,36 @@ module Que
                 event: "que_job.job_worked",
                 msg: "Successfully worked job",
                 duration: duration,
-              )
+              ),
             )
-          rescue StandardError, NotImplementedError, JobTimeoutError => error
+          rescue StandardError, NotImplementedError, JobTimeoutError => e
             JobErrorTotal.increment(labels: labels)
             Que.logger&.error(
               log_keys.merge(
                 event: "que_job.job_error",
                 msg: "Job failed with error",
-                error: error.inspect,
-              )
+                error: e.inspect,
+              ),
             )
 
             # For compatibility with que-failure, we need to allow failure handlers to be
             # defined on the job class.
             if klass&.respond_to?(:handle_job_failure)
-              klass.handle_job_failure(error, job)
+              klass.handle_job_failure(e, job)
             else
-              handle_job_failure(error, job)
+              handle_job_failure(e, job)
             end
           end
           :job_worked
         end
       end
-    rescue PG::Error, Adapters::UnavailableConnection => _error
+    rescue PG::Error, Adapters::UnavailableConnection => _e
       # In the event that our Postgres connection is bad, we don't want that error to halt
       # the work loop. Instead, we should let the work loop sleep and retry.
       :postgres_error
     end
-    # rubocop:enable Metrics/MethodLength
-    # rubocop:enable Metrics/AbcSize
 
+    # rubocop:enable Metrics/MethodLength
     def stop!
       @stop = true
       @current_running_job&.stop!
@@ -276,7 +273,7 @@ module Que
       Que.execute(
         :set_error, [
           count,
-          count**4 + 3, # exponentially back off when retrying failures
+          (count**4) + 3, # exponentially back off when retrying failures
           "#{error.message}\n#{error.backtrace.join("\n")}",
           *job.values_at(*Job::JOB_INSTANCE_FIELDS),
         ]

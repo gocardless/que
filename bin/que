@@ -53,8 +53,8 @@ OptionParser.new do |opts|
     options.timeout = timeout
   end
 
-  opts.on("--permissive [BOOL]", FalseClass, "Flag to determine if this worker should only aquire work from its specified queue or simply priorisize it (default: false)") do |permissive|
-    options.permissive = permissive
+  opts.on("--secondary-queues high_priority_queue,low_priority_queue", Array, "Sets the queues to poll for multiple queue comsumption") do |_queues|
+    options.secondary_queues = secondary_queues
   end
 
   opts.on("-v", "--version", "Show Que version") do
@@ -109,8 +109,6 @@ def wait_for_signals(*signals, sleep_interval: 1)
   sleep(sleep_interval) until received_signal
 end
 
-queue_selection = options.permissive ? "permissive" : "exclusive"
-
 worker_group = Que::WorkerGroup.start(
   worker_count,
   queue: queue_name,
@@ -118,7 +116,7 @@ worker_group = Que::WorkerGroup.start(
   lock_cursor_expiry: cursor_expiry,
   lock_window: options.lock_window,
   lock_budget: options.lock_budget,
-  queue_selection: queue_selection,
+  secondary_queues: options.secondary_queues,
 )
 
 if options.metrics_port

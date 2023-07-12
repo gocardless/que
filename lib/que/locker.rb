@@ -53,12 +53,12 @@ module Que
       ),
     ].freeze
 
-    def initialize(queue:, cursor_expiry:, window: nil, budget: nil, queue_selection_strategy: "exclusive")
+    def initialize(queue:, cursor_expiry:, window: nil, budget: nil, secondary_queues: [])
       @queue = queue
       @cursor_expiry = cursor_expiry
       @cursor = 0
       @cursor_expires_at = monotonic_now
-      @queue_selection_strategy = queue_selection_strategy
+      @secondary_queues = secondary_queues
 
       # Create a bucket that has 100% capacity, so even when we don't apply a limit we
       # have a valid bucket that we can use everywhere
@@ -69,8 +69,6 @@ module Que
     # calling the given block will cause the worker to immediately retry locking a job-
     # yielding with nil means there were no jobs to lock, and the worker will pause before
     # retrying.
-    # rubocop:disable Metrics/AbcSize
-    # rubocop:disable Metrics/PerceivedComplexity
     def with_locked_job
       reset_cursor if cursor_expired?
 
@@ -113,8 +111,6 @@ module Que
         end
       end
     end
-    # rubocop:enable Metrics/AbcSize
-    # rubocop:enable Metrics/PerceivedComplexity
 
     private
 
@@ -126,7 +122,7 @@ module Que
     def execute_lock_job
       strategy = @cursor.zero? ? "full" : "cursor"
       observe(AcquireTotal, AcquireSecondsTotal, strategy: strategy) do
-        Que.execute(lock_job_query, [@queue, @cursor]).first
+        lock_job_query
       end
     end
 
@@ -137,13 +133,11 @@ module Que
     end
 
     def lock_job_query
-      case @queue_selection_strategy
-      when "exclusive"
-        :lock_job
-      when "permissive"
-        :queue_permissive_lock_job
+      if @secondary_queues.any?
+        Que.execute(:queue_permissive_lock_job,
+                    [@queue, @cursor, "{" + @secondary_queues.join(",") + "}"]).first
       else
-        raise "Unexpected queue_selection_strategy=#{@queue_selection_strategy}"
+        Que.execute(:lock_job, [@queue, @cursor]).first
       end
     end
 
@@ -164,7 +158,7 @@ module Que
       if metric_duration
         metric_duration.increment(
           by: monotonic_now - now,
-          labels: labels.merge(queue: @queue)
+          labels: labels.merge(queue: @queue),
         )
       end
     end
