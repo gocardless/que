@@ -59,6 +59,7 @@ module Que
       @cursor = 0
       @cursor_expires_at = monotonic_now
       @secondary_queues = secondary_queues
+      @consolidated_queues = [queue].concat(secondary_queues)
 
       # Create a bucket that has 100% capacity, so even when we don't apply a limit we
       # have a valid bucket that we can use everywhere
@@ -134,8 +135,13 @@ module Que
 
     def lock_job_query
       if @secondary_queues.any?
-        Que.execute(:queue_permissive_lock_job,
-                    [@queue, @cursor, "{" + @secondary_queues.join(",") + "}"]).first
+        Que.execute(
+          :queue_permissive_lock_job,
+          [
+            "{" + @consolidated_queues.join(",") + "}",
+            @cursor,
+          ]
+        ).first
       else
         Que.execute(:lock_job, [@queue, @cursor]).first
       end

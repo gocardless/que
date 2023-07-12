@@ -93,11 +93,11 @@ module Que
           SELECT j
           FROM que_jobs AS j
           WHERE job_id >= $2
-          AND (queue = $1::text OR queue = ANY($3::text[]))
+          AND queue = ANY($1::text[])
           AND run_at <= now()
           AND retryable = true
           ORDER BY
-            CASE WHEN queue = $1::text THEN 0 ELSE 1 END,
+            array_position($1::text[], queue),
             priority,
             run_at,
             job_id
@@ -110,11 +110,11 @@ module Que
               SELECT j
               FROM que_jobs AS j
               WHERE run_at <= now()
-              AND (queue = $1::text OR queue = ANY($3::text[]))
+              AND queue = ANY($1::text[])
               AND retryable = true
               AND (priority, run_at, job_id) > (jobs.priority, jobs.run_at, jobs.job_id)
               ORDER BY
-                CASE WHEN queue = $1::text THEN 0 ELSE 1 END,
+                array_position($1::text[], queue),
                 priority,
                 run_at,
                 job_id
