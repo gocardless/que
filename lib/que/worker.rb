@@ -17,32 +17,32 @@ module Que
       RunningSecondsTotal = Prometheus::Client::Counter.new(
         :que_worker_running_seconds_total,
         docstring: "Time since starting to work jobs",
-        labels: %i[queue worker],
+        labels: %i[queue worker primary_queue],
       ),
       SleepingSecondsTotal = Prometheus::Client::Counter.new(
         :que_worker_sleeping_seconds_total,
         docstring: "Time spent sleeping due to no jobs",
-        labels: %i[queue worker],
+        labels: %i[queue worker primary_queue],
       ),
       JobWorkedTotal = Prometheus::Client::Counter.new(
         :que_job_worked_total,
         docstring: "Counter for all jobs processed",
-        labels: %i[job_class priority queue],
+        labels: %i[job_class priority queue primary_queue],
       ),
       JobErrorTotal = Prometheus::Client::Counter.new(
         :que_job_error_total,
         docstring: "Counter for all jobs that were run but errored",
-        labels: %i[job_class priority queue],
+        labels: %i[job_class priority queue primary_queue],
       ),
       JobWorkedSecondsTotal = Prometheus::Client::Counter.new(
         :que_job_worked_seconds_total,
         docstring: "Sum of the time spent processing each job class",
-        labels: %i[job_class priority queue worker],
+        labels: %i[job_class priority queue worker primary_queue],
       ),
       JobLatencySecondsTotal = Prometheus::Client::Counter.new(
         :que_job_latency_seconds_total,
         docstring: "Sum of time spent waiting in queue",
-        labels: %i[job_class priority queue],
+        labels: %i[job_class priority queue primary_queue],
       ),
     ].freeze
 
@@ -143,15 +143,19 @@ module Que
     def work_loop
       return if @stop
 
-      @tracer.trace(RunningSecondsTotal, queue: @queue) do
+      @tracer.trace(RunningSecondsTotal, queue: @queue, primary_queue: @queue) do
         loop do
           case event = work
           when :postgres_error
             Que.logger&.info(event: "que.postgres_error", wake_interval: @wake_interval)
-            @tracer.trace(SleepingSecondsTotal, queue: @queue) { sleep(@wake_interval) }
+            @tracer.trace(SleepingSecondsTotal, queue: @queue, primary_queue: @queue) do 
+              sleep(@wake_interval)
+            end
           when :job_not_found
             Que.logger&.debug(event: "que.job_not_found", wake_interval: @wake_interval)
-            @tracer.trace(SleepingSecondsTotal, queue: @queue) { sleep(@wake_interval) }
+            @tracer.trace(SleepingSecondsTotal, queue: @queue, primary_queue: @queue) do 
+              sleep(@wake_interval) 
+            end
           when :job_worked
             nil # immediately find a new job to work
           end
@@ -171,6 +175,7 @@ module Que
           log_keys = {
             priority: job["priority"],
             queue: job["queue"],
+            primary_queue: @queue,
             handler: job["job_class"],
             job_class: job["job_class"],
             job_error_count: job["error_count"],
@@ -178,7 +183,10 @@ module Que
           }
 
           labels = {
-            job_class: job["job_class"], priority: job["priority"], queue: job["queue"]
+            job_class: job["job_class"], 
+            priority: job["priority"], 
+            queue: job["queue"],
+            primary_queue: @queue,
           }
 
           begin

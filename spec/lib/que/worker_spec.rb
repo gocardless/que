@@ -29,6 +29,7 @@ RSpec.describe Que::Worker do
                  msg: "Job acquired, beginning work",
                  priority: 100,
                  queue: "default",
+                 primary_queue: "default",
                  que_job_id: job.attrs["job_id"],
                  latency: an_instance_of(Float),
                ))
@@ -43,6 +44,7 @@ RSpec.describe Que::Worker do
                  msg: "Successfully worked job",
                  priority: 100,
                  queue: "default",
+                 primary_queue: "default",
                  que_job_id: job.attrs["job_id"],
                ))
         subject
@@ -73,6 +75,7 @@ RSpec.describe Que::Worker do
                    msg: "Job acquired, beginning work",
                    priority: 100,
                    queue: "default",
+                   primary_queue: "default",
                    que_job_id: job.attrs["job_id"],
                    latency: an_instance_of(Float),
                    custom_log_1: 1,
@@ -89,6 +92,7 @@ RSpec.describe Que::Worker do
                    msg: "Successfully worked job",
                    priority: 100,
                    queue: "default",
+                   primary_queue: "default",
                    que_job_id: job.attrs["job_id"],
                    custom_log_1: 1,
                    custom_log_2: "test-log",
