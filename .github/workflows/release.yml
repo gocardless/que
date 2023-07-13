@@ -1,0 +1,24 @@
+name: Publish gem to GitHub package registry
+
+on:
+  push:
+    tags:
+      - v*
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Ruby
+        uses: gocardless/github-actions/shared/actions/ruby-bundle-install@master
+        with:
+          known_hosts: ${{ secrets.KNOWN_HOSTS_GITHUB_KEY }}
+          robot_ssh_key: ${{ secrets.ROBOT_READONLY_SSH_KEY }}
+          token: ${{ secrets.ROBOT_READONLY_PACKAGE_READER }}
+      - name: Publish Gem
+        uses: gocardless/github-actions/shared/actions/publish-internal-gem@master
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          known_hosts: ${{ secrets.KNOWN_HOSTS_GITHUB_KEY }}
+          robot_ssh_key: ${{ secrets.ROBOT_READONLY_SSH_KEY }}
