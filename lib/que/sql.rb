@@ -84,8 +84,8 @@ module Que
       LIMIT 1
     },
 
-    # instead of keeping this worker in a exclusivee queue mode let it take work
-    # from defined secondary_queues with work availble.
+    # instead of keeping this worker in a exclusive queue mode let it take work
+    # from defined secondary_queues with work available.
     queue_permissive_lock_job: %{
       WITH RECURSIVE jobs AS (
         SELECT (j).*, pg_try_advisory_lock((j).job_id) AS locked
