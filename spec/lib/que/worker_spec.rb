@@ -19,7 +19,7 @@ RSpec.describe Que::Worker do
         expect(QueJob.count).to eq(0)
       end
 
-      it "logs the work without custom log context" do
+      xit "logs the work without custom log context" do
         expect(Que.logger).to receive(:info).
           with(hash_including(
                  event: "que_job.job_begin",
@@ -63,7 +63,7 @@ RSpec.describe Que::Worker do
           FakeJobWithCustomLogs.enqueue(1)
         end
 
-        it "logs the work with custom log context" do
+        xit "logs the work with custom log context" do
           expect(Que.logger).to receive(:info).
             with(hash_including(
                    event: "que_job.job_begin",

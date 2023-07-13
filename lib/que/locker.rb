@@ -53,11 +53,13 @@ module Que
       ),
     ].freeze
 
-    def initialize(queue:, cursor_expiry:, window: nil, budget: nil)
+    def initialize(queue:, cursor_expiry:, window: nil, budget: nil, secondary_queues: [])
       @queue = queue
       @cursor_expiry = cursor_expiry
       @cursor = 0
       @cursor_expires_at = monotonic_now
+      @secondary_queues = secondary_queues
+      @consolidated_queues = Array.wrap(queue).concat(secondary_queues)
 
       # Create a bucket that has 100% capacity, so even when we don't apply a limit we
       # have a valid bucket that we can use everywhere
@@ -68,8 +70,6 @@ module Que
     # calling the given block will cause the worker to immediately retry locking a job-
     # yielding with nil means there were no jobs to lock, and the worker will pause before
     # retrying.
-    # rubocop:disable Metrics/AbcSize
-    # rubocop:disable Metrics/PerceivedComplexity
     def with_locked_job
       reset_cursor if cursor_expired?
 
@@ -112,8 +112,6 @@ module Que
         end
       end
     end
-    # rubocop:enable Metrics/AbcSize
-    # rubocop:enable Metrics/PerceivedComplexity
 
     private
 
@@ -125,13 +123,27 @@ module Que
     def execute_lock_job
       strategy = @cursor.zero? ? "full" : "cursor"
       observe(AcquireTotal, AcquireSecondsTotal, strategy: strategy) do
-        Que.execute(:lock_job, [@queue, @cursor]).first
+        lock_job_query
       end
     end
 
     def exists?(job)
       observe(ExistsTotal, ExistsSecondsTotal) do
         Que.execute(:check_job, job.values_at(*Job::JOB_INSTANCE_FIELDS)).any? if job
+      end
+    end
+
+    def lock_job_query
+      if @secondary_queues.any?
+        Que.execute(
+          :queue_permissive_lock_job,
+          [
+            "{" + @consolidated_queues.join(",") + "}",
+            @cursor,
+          ]
+        ).first
+      else
+        Que.execute(:lock_job, [@queue, @cursor]).first
       end
     end
 
@@ -152,7 +164,7 @@ module Que
       if metric_duration
         metric_duration.increment(
           by: monotonic_now - now,
-          labels: labels.merge(queue: @queue)
+          labels: labels.merge(queue: @queue),
         )
       end
     end

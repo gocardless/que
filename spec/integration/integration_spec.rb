@@ -4,8 +4,12 @@ require "spec_helper"
 require "que/worker" # required to prevent autoload races
 
 RSpec.describe "multiple workers" do
-  def with_workers(num, stop_timeout: 5)
-    Que::WorkerGroup.start(num, wake_interval: 0.01).tap { yield }.stop(stop_timeout)
+  def with_workers(num, stop_timeout: 5, secondary_queues: [], &block)
+    Que::WorkerGroup.start(
+      num,
+      wake_interval: 0.01,
+      secondary_queues: secondary_queues,
+    ).tap(&block).stop(stop_timeout)
   end
 
   # Wait for a maximum of [timeout] seconds for all jobs to be worked
@@ -28,6 +32,53 @@ RSpec.describe "multiple workers" do
 
       expect(QueJob.count).to eq(0)
       expect(FakeJob.log.count).to eq(10)
+    end
+  end
+
+  context "with a job on a non default queue" do
+    context "with exclusive workers" do
+      it "does not work the job on the non-default queue" do
+        FakeJob.enqueue(1, queue: "default")
+        FakeJob.enqueue(2, queue: "non-default")
+
+        expect(QueJob.count).to eq(2)
+
+        with_workers(1) { wait_for_jobs_to_be_worked(timeout: 1) }
+
+        expect(QueJob.count).to eq(1)
+        expect(FakeJob.log.count).to eq(1)
+      end
+    end
+
+    context "with permissive workers" do
+      it "works each job exactly once" do
+        FakeJob.enqueue(1, queue: "default")
+        FakeJob.enqueue(2, queue: "non-default")
+
+        expect(QueJob.count).to eq(2)
+
+        with_workers(1, secondary_queues: ["non-default"]) do
+          wait_for_jobs_to_be_worked(timeout: 1)
+        end
+
+        expect(QueJob.count).to eq(0)
+        expect(FakeJob.log.count).to eq(2)
+      end
+
+      it "works jobs for defined secondary_queues only" do
+        FakeJob.enqueue(1, queue: "default")
+        FakeJob.enqueue(2, queue: "non-default")
+        FakeJob.enqueue(3, queue: "not-worked")
+
+        expect(QueJob.count).to eq(3)
+
+        with_workers(1, secondary_queues: ["non-default"]) do
+          wait_for_jobs_to_be_worked(timeout: 1)
+        end
+
+        expect(QueJob.count).to eq(1)
+        expect(FakeJob.log.count).to eq(2)
+      end
     end
   end
 
@@ -80,7 +131,7 @@ RSpec.describe "multiple workers" do
 
       sleep_job = QueJob.last
 
-      expect(sleep_job).to_not be(nil)
+      expect(sleep_job).to_not be_nil
       expect(sleep_job.last_error).to match(/Job exceeded timeout when requested to stop/)
     end
 

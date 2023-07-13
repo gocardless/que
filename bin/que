@@ -1,8 +1,6 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# frozen_string_literal: true
-
 require "logger"
 require "optparse"
 require "ostruct"
@@ -53,6 +51,10 @@ OptionParser.new do |opts|
 
   opts.on("--timeout [TIMEOUT]", Float, "Set the duration (in seconds) to wait, after receiving SIGTERM/SIGINT, for workers to finish before forcing them to stop") do |timeout|
     options.timeout = timeout
+  end
+
+  opts.on("--secondary-queues high_priority_queue,low_priority_queue", Array, "Sets the queues to poll for multiple queue consumption") do |secondary_queues|
+    options.secondary_queues = secondary_queues
   end
 
   opts.on("-v", "--version", "Show Que version") do
@@ -114,6 +116,7 @@ worker_group = Que::WorkerGroup.start(
   lock_cursor_expiry: cursor_expiry,
   lock_window: options.lock_window,
   lock_budget: options.lock_budget,
+  secondary_queues: options.secondary_queues,
 )
 
 if options.metrics_port
