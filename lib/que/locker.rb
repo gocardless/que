@@ -59,7 +59,7 @@ module Que
       @cursor = 0
       @cursor_expires_at = monotonic_now
       @secondary_queues = secondary_queues
-      @consolidated_queues = [queue].concat(secondary_queues)
+      @consolidated_queues = Array.wrap(queue).concat(secondary_queues)
 
       # Create a bucket that has 100% capacity, so even when we don't apply a limit we
       # have a valid bucket that we can use everywhere
