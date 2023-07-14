@@ -27,22 +27,22 @@ module Que
       JobWorkedTotal = Prometheus::Client::Counter.new(
         :que_job_worked_total,
         docstring: "Counter for all jobs processed",
-        labels: %i[job_class priority queue primary_queue],
+        labels: %i[job_class priority queue primary_queue worked_queue],
       ),
       JobErrorTotal = Prometheus::Client::Counter.new(
         :que_job_error_total,
         docstring: "Counter for all jobs that were run but errored",
-        labels: %i[job_class priority queue primary_queue],
+        labels: %i[job_class priority queue primary_queue worked_queue],
       ),
       JobWorkedSecondsTotal = Prometheus::Client::Counter.new(
         :que_job_worked_seconds_total,
         docstring: "Sum of the time spent processing each job class",
-        labels: %i[job_class priority queue worker primary_queue],
+        labels: %i[job_class priority queue worker primary_queue worked_queue],
       ),
       JobLatencySecondsTotal = Prometheus::Client::Counter.new(
         :que_job_latency_seconds_total,
         docstring: "Sum of time spent waiting in queue",
-        labels: %i[job_class priority queue primary_queue],
+        labels: %i[job_class priority queue primary_queue worked_queue],
       ),
     ].freeze
 
@@ -174,8 +174,16 @@ module Que
 
           log_keys = {
             priority: job["priority"],
-            queue: job["queue"],
+            # TODO alerting / monitoring pre addition of secondary queues
+            # assume that a worker would not work a job from another queue.
+            # With the addition of secondary queues this is no longer true.
+            # To support moving to the new `primary_queue` field without 
+            # disrupting existing tooling we "lie" and say the queue worked
+            # is the primary queue. Longer term alerting / monitoring should move
+            # to look at `primary_queue` and `worked_queue` instead.
+            queue: @queue,
             primary_queue: @queue,
+            worked_queue: job["queue"],
             handler: job["job_class"],
             job_class: job["job_class"],
             job_error_count: job["error_count"],
@@ -185,8 +193,9 @@ module Que
           labels = {
             job_class: job["job_class"], 
             priority: job["priority"], 
-            queue: job["queue"],
+            queue: @queue,
             primary_queue: @queue,
+            worked_queue: job["queue"],
           }
 
           begin
