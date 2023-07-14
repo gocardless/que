@@ -88,7 +88,7 @@ module Que
     # from defined secondary_queues with work available.
     queue_permissive_lock_job: %{
       WITH RECURSIVE jobs AS (
-        SELECT (j).*, pg_try_advisory_lock((j).job_id) AS locked
+        SELECT (j).*, pg_try_advisory_lock((j).job_id) AS locked, array_position($1::text[], queue) as queue_priority
         FROM (
           SELECT j
           FROM que_jobs AS j
@@ -104,7 +104,7 @@ module Que
           LIMIT 1
         ) AS t1
         UNION ALL (
-          SELECT (j).*, pg_try_advisory_lock((j).job_id) AS locked
+          SELECT (j).*, pg_try_advisory_lock((j).job_id) AS locked, array_position($1::text[], queue) as queue_priority
           FROM (
             SELECT (
               SELECT j
@@ -112,7 +112,7 @@ module Que
               WHERE run_at <= now()
               AND queue = ANY($1::text[])
               AND retryable = true
-              AND (priority, run_at, job_id) > (jobs.priority, jobs.run_at, jobs.job_id)
+              AND (array_position($1::text[], queue), priority, run_at, job_id) > (jobs.queue_priority, jobs.priority, jobs.run_at, jobs.job_id)
               ORDER BY
                 array_position($1::text[], queue),
                 priority,
