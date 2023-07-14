@@ -164,3 +164,4 @@ Note that we iterate because there's no guarantee that the hang would reappear w
 TIP: If you're getting errors about the database not existing when you run the tests, run the following in a shell:
 
 `createdb que-test`
+
