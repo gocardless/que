@@ -84,55 +84,6 @@ module Que
       LIMIT 1
     },
 
-    # instead of keeping this worker in a exclusive queue mode let it take work
-    # from defined secondary_queues with work available.
-    queue_permissive_lock_job: %{
-      WITH RECURSIVE jobs AS (
-        SELECT (j).*, pg_try_advisory_lock((j).job_id) AS locked
-        FROM (
-          SELECT j
-          FROM que_jobs AS j
-          WHERE job_id >= $2
-          AND queue = ANY($1::text[])
-          AND run_at <= now()
-          AND retryable = true
-          ORDER BY
-            array_position($1::text[], queue),
-            priority,
-            run_at,
-            job_id
-          LIMIT 1
-        ) AS t1
-        UNION ALL (
-          SELECT (j).*, pg_try_advisory_lock((j).job_id) AS locked
-          FROM (
-            SELECT (
-              SELECT j
-              FROM que_jobs AS j
-              WHERE run_at <= now()
-              AND queue = ANY($1::text[])
-              AND retryable = true
-              AND (priority, run_at, job_id) > (jobs.priority, jobs.run_at, jobs.job_id)
-              ORDER BY
-                array_position($1::text[], queue),
-                priority,
-                run_at,
-                job_id
-              LIMIT 1
-            ) AS j
-            FROM jobs
-            WHERE jobs.job_id IS NOT NULL
-            LIMIT 1
-          ) AS t1
-        )
-      )
-      SELECT queue, priority, run_at, job_id, job_class, retryable, args, error_count,
-             extract(epoch from (now() - run_at)) as latency
-      FROM jobs
-      WHERE locked
-      LIMIT 1
-    },
-
     check_job: %(
       SELECT 1 AS one
       FROM   que_jobs
