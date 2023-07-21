@@ -19,37 +19,37 @@ module Que
       ExistsTotal = Prometheus::Client::Counter.new(
         :que_locker_exists_total,
         docstring: "Counter of attempts to check job existence before locking",
-        labels: [:queue],
+        labels: %i[queue primary_queue worked_queue],
       ),
       ExistsSecondsTotal = Prometheus::Client::Counter.new(
         :que_locker_exists_seconds_total,
         docstring: "Seconds spent checking job exists before locking",
-        labels: [:queue],
+        labels: %i[queue primary_queue worked_queue],
       ),
       UnlockTotal = Prometheus::Client::Counter.new(
         :que_locker_unlock_total,
         docstring: "Counter of attempts to unlock job advisory locks",
-        labels: [:queue],
+        labels: %i[queue primary_queue worked_queue],
       ),
       UnlockSecondsTotal = Prometheus::Client::Counter.new(
         :que_locker_unlock_seconds_total,
         docstring: "Seconds spent unlocking job advisory locks",
-        labels: [:queue],
+        labels: %i[queue primary_queue worked_queue],
       ),
       ThrottleSecondsTotal = Prometheus::Client::Counter.new(
         :que_locker_throttle_seconds_total,
         docstring: "Seconds spent throttling calls to lock jobs",
-        labels: [:queue],
+        labels: %i[queue primary_queue worked_queue],
       ),
       AcquireTotal = Prometheus::Client::Counter.new(
         :que_locker_acquire_total,
         docstring: "Counter of number of job lock queries executed",
-        labels: %i[queue strategy],
+        labels: %i[queue primary_queue worked_queue strategy],
       ),
       AcquireSecondsTotal = Prometheus::Client::Counter.new(
         :que_locker_acquire_seconds_total,
         docstring: "Seconds spent running job lock query",
-        labels: %i[queue strategy],
+        labels: %i[queue primary_queue worked_queue strategy],
       ),
     ].freeze
 
@@ -120,7 +120,7 @@ module Que
       yield job
     ensure
       if job
-        observe(UnlockTotal, UnlockSecondsTotal) do
+        observe(UnlockTotal, UnlockSecondsTotal, worked_queue: job[:queue]) do
           Que.execute("SELECT pg_advisory_unlock($1)", [job[:job_id]])
         end
       end
@@ -129,19 +129,21 @@ module Que
     private
 
     def lock_job_in(queue, cursor)
-      observe(nil, ThrottleSecondsTotal) { @leaky_bucket.refill }
+      observe(nil, ThrottleSecondsTotal, worked_queue: queue) { @leaky_bucket.refill }
       @leaky_bucket.observe { execute_lock_job_in(queue, cursor) }
     end
 
     def execute_lock_job_in(queue, cursor)
       strategy = cursor.zero? ? "full" : "cursor"
-      observe(AcquireTotal, AcquireSecondsTotal, strategy: strategy) do
+      observe(AcquireTotal, AcquireSecondsTotal,
+              worked_queue: queue,
+              strategy: strategy) do
         lock_job_query(queue, cursor)
       end
     end
 
     def exists?(job)
-      observe(ExistsTotal, ExistsSecondsTotal) do
+      observe(ExistsTotal, ExistsSecondsTotal, worked_queue: job[:queue]) do
         Que.execute(:check_job, job.values_at(*Job::JOB_INSTANCE_FIELDS)).any? if job
       end
     end
@@ -166,10 +168,10 @@ module Que
       now = monotonic_now
       yield
     ensure
-      metric&.increment(labels: labels.merge(queue: @queue))
+      metric&.increment(labels: labels.merge(queue: @queue, primary_queue: @queue))
       metric_duration&.increment(
         by: monotonic_now - now,
-        labels: labels.merge(queue: @queue),
+        labels: labels.merge(queue: @queue, primary_queue: @queue),
       )
     end
 
