@@ -1,0 +1,28 @@
+name: tests
+on: push
+
+jobs:
+  test_and_lint:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        ruby_version:
+        - '2.6'
+        - '2.7'
+        - '3.0'
+    steps:
+    - uses: actions/checkout@v3.1.0
+    - uses: gocardless/github-actions/shared/actions/ruby-bundle-install@master
+      with:
+        known_hosts: ${{ secrets.KNOWN_HOSTS_GITHUB_KEY }}
+        robot_ssh_key: ${{ secrets.ROBOT_READONLY_SSH_KEY }}
+        token: ${{ secrets.ROBOT_READONLY_PACKAGE_READER }}
+        ruby_version: ${{ matrix.ruby_version }}
+    - name: Run specs
+      run: RUBYOPT="-W0" bundle exec rspec --format progress --format RSpec::Github::Formatter -o /tmp/rspec.xml
+    - name: Rubocop
+      run: bundle exec rubocop --extra-details --display-style-guide --parallel --force-exclusion
+    - uses: actions/upload-artifact@v2
+      if: failure()
+      with:
+        path: /tmp/ci_artifacts/
