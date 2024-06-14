@@ -34,6 +34,23 @@ establish_database_connection
 Que.connection = ActiveRecord
 Que.migrate!
 
+
+class LockDataBaseRecord < ActiveRecord::Base
+  def self.establish_lock_database_connection
+    establish_connection(
+      adapter: "postgresql",
+      host: ENV.fetch("LOCK_PGHOST", "localhost"),
+      user: ENV.fetch("LOCK_PGUSER", "ubuntu"),
+      password: ENV.fetch("LOCK_PGPASSWORD", "password"),
+      database: ENV.fetch("LOCK_PGDATABASE", "lock-test"),
+      port: ENV.fetch("LOCK_PGPORT", 5434),
+    )
+  end
+  def self.connection
+    establish_lock_database_connection.connection
+  end
+end
+
 # Ensure we have a logger, so that we can test the code paths that log
 Que.logger = Logger.new("/dev/null")
 

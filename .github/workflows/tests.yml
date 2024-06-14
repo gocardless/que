@@ -25,6 +25,19 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
+      lock_database:
+        image: postgres:${{ matrix.postgres-version }}
+        env:
+          POSTGRES_DB: lock-test
+          POSTGRES_USER: ubuntu
+          POSTGRES_PASSWORD: password
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
       
     env:
       PGDATABASE: que-test
@@ -32,6 +45,10 @@ jobs:
       PGPASSWORD: password
       PGHOST: localhost
       BUNDLE_RUBYGEMS__PKG__GITHUB__COM: gocardless-robot-readonly:${{ secrets.GITHUB_TOKEN }}
+      LOCK_PGDATABASE: lock-test
+      LOCK_PGUSER: ubuntu
+      LOCK_PGPASSWORD: password
+      LOCK_PGHOST: localhost
     steps:
       - uses: actions/checkout@v3
       - name: Set up Ruby
