@@ -1,0 +1,48 @@
+name: Run Specs
+
+on:
+  push:
+permissions:
+  contents: read
+  # We need write access to the id-token to use workload identity federation
+  id-token: write
+  packages: read
+  # Needed for getting PR labels
+  pull-requests: read
+
+
+env:
+  PGDATABASE: que-test
+  PGUSER: ubuntu
+  PGPASSWORD: password
+  PGHOST: localhost
+
+jobs:
+  rspec:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        ruby_version: ["2.6", "2.7", "3.0"]
+    
+    services:
+      postgres:
+        image: postgres:11.2
+        env:
+          POSTGRES_DB: que-test
+          POSTGRES_USER: ubuntu
+          POSTGRES_PASSWORD: password
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+    
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+          ruby-version: "${{ matrix.ruby-version }}"
+      
+      - name: Run Specs
+        run: |
+          bundle exec rspec
