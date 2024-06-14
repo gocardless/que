@@ -22,6 +22,6 @@ group :test do
 end
 
 gem 'prometheus-client', '~> 1.0'
-gem 'prometheus_gcstat', git: 'git@github.com:gocardless/prometheus_gcstat_ruby'
+# gem 'prometheus_gcstat', git: 'git@github.com:gocardless/prometheus_gcstat_ruby'
 
 gemspec
