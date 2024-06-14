@@ -13,6 +13,7 @@ require_relative "helpers/que_job"
 require_relative "helpers/sleep_job"
 require_relative "helpers/interruptible_sleep_job"
 require_relative "helpers/user"
+require_relative "active_record_with_lock_spec_helper"
 
 def postgres_now
   ActiveRecord::Base.connection.execute("SELECT NOW();")[0]["now"]
@@ -22,8 +23,8 @@ def establish_database_connection
   ActiveRecord::Base.establish_connection(
     adapter: "postgresql",
     host: ENV.fetch("PGHOST", "localhost"),
-    user: ENV.fetch("PGUSER", "postgres"),
-    password: ENV.fetch("PGPASSWORD", ""),
+    user: ENV.fetch("PGUSER", "ubuntu"),
+    password: ENV.fetch("PGPASSWORD", "password"),
     database: ENV.fetch("PGDATABASE", "que-test"),
   )
 end
@@ -31,7 +32,12 @@ end
 establish_database_connection
 
 # Make sure our test database is prepared to run Que
-Que.connection = ActiveRecord
+Que.connection =
+  case ENV["ADAPTER"]
+  when "ActiveRecordWithLock" then active_record_with_lock_adapter_connection
+  else ActiveRecord
+  end
+
 Que.migrate!
 
 # Ensure we have a logger, so that we can test the code paths that log

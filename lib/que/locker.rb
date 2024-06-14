@@ -121,7 +121,7 @@ module Que
     ensure
       if job
         observe(UnlockTotal, UnlockSecondsTotal, worked_queue: job[:queue]) do
-          Que.execute("SELECT pg_advisory_unlock($1)", [job[:job_id]])
+          Que.execute(:unlock_job, [job[:job_id]])
         end
       end
     end
