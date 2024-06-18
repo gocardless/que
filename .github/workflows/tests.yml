@@ -26,7 +26,7 @@ jobs:
           --health-timeout 5s
           --health-retries 10
       lock_database:
-        image: postgres:${{ matrix.postgres-version }}
+        image: postgres:14.2
         env:
           POSTGRES_DB: lock-test
           POSTGRES_USER: ubuntu
@@ -58,4 +58,4 @@ jobs:
           ruby-version: "${{ matrix.ruby-version }}"
       - name: Run specs
         run: |
-          bundle exec rspec
+          bundle exec rspec 
