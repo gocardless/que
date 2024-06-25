@@ -12,50 +12,43 @@ module Que
             YugabyteRecord.connection_pool.with_connection(&block)
         end
 
-        # def establish_lock_database_connection
-        #     Thread.current["lock_database_connection_#{Thread.current.__id__}"] = LockDatabaseRecord.connection
-        # end
-
-        # def lock_database_connection
-        #     # connection =  @lock_database_connection[Thread.current.name]
-        #     # return connection unless connection.nil?
-        #     # @lock_database_connection[Thread.current.name] = LockDatabaseRecord.connection
-        #     @lock_database_connection ||= LockDatabaseRecord.connection
-        # end
-
-        def setup_lock_database_connection
-            ::LockDatabaseRecord.connection 
+        def checkout_lock_database_connection
+            # when multiple threads are running we need to make sure
+            # the acquiring and releasing of advisory locks is done by the 
+            # same connection
+            Thread.current[:db_connection] ||= LockDatabaseRecord.connection_pool.checkout
         end
 
-        # def execute(command, params=[])
-        #     if command == :lock_job
-        #         queue, cursor, lock_database_connection = params
-        #         lock_job_with_lock_database(queue, cursor, lock_database_connection)
-        #     elsif command == :unlock_job
-        #         job_id, lock_database_connection = params
-        #         unlock_job(job_id, lock_database_connection)
-        #     else
-        #         super(command, params)
-        #     end
-        # end
+        def lock_database_connection
+            Thread.current[:db_connection]
+        end
 
-        def lock_job_with_lock_database(queue, cursor, lock_database_connection)
-            query = QueJob.select(:job_id, :queue, :priority, :run_at, :job_class, :retryable, :args, :error_count)
-                        .select("extract(epoch from (now() - run_at)) as latency")
-                        .where("queue = ? AND job_id >= ? AND run_at <= ?", queue, cursor, Time.now)
-                        .where(retryable: true)
-                        .order(:priority, :run_at, :job_id)
-                        .limit(1).to_sql
+        def release_lock_database_connection
+            LockDatabaseRecord.connection_pool.checkin(Thread.current[:db_connection])
+        end
 
-            result = Que.execute(query)
+        def execute(command, params=[])
+            if command == :lock_job
+                queue, cursor = params
+                lock_job_with_lock_database(queue, cursor)
+            elsif command == :unlock_job
+                job_id = params[0]
+                unlock_job(job_id)
+            else
+                super(command, params)
+            end
+        end
+
+        def lock_job_with_lock_database(queue, cursor)            
+            result = Que.execute(:find_job_to_lock, [queue, cursor])
             return result if result.empty?
          
-             if locked?(result.first['job_id'], lock_database_connection)
+             if locked?(result.first['job_id'])
                 return result
              end
            
             # continue the recursion to fetch the next available job
-            lock_job_with_lock_database(queue, result.first['job_id'], lock_database_connection)
+            lock_job_with_lock_database(queue, result.first['job_id'])
         end
 
         def cleanup!
@@ -63,11 +56,11 @@ module Que
             LockDatabaseRecord.connection_pool.release_connection
         end
 
-        def locked?(job_id, lock_database_connection)
-          lock_database_connection.execute("SELECT pg_try_advisory_lock(#{job_id})").first["pg_try_advisory_lock"]
+        def locked?(job_id)
+            lock_database_connection.execute("SELECT pg_try_advisory_lock(#{job_id})").try(:first)&.fetch('pg_try_advisory_lock')
         end
 
-        def unlock_job(job_id, lock_database_connection)
+        def unlock_job(job_id)
            lock_database_connection.execute("SELECT pg_advisory_unlock(#{job_id})")
         end
       end

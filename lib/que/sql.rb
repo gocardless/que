@@ -162,6 +162,30 @@ module Que
         WHERE locktype = 'advisory'
       ) pg USING (job_id)
     },
+
+    unlock_job: %{
+      SELECT pg_advisory_unlock($1)
+    },
+
+    find_job_to_lock: %{
+      SELECT 
+        queue, 
+        priority, 
+        run_at, 
+        job_id, 
+        job_class, 
+        retryable, 
+        args, 
+        error_count,
+        extract(epoch from (now() - run_at)) as latency
+      FROM que_jobs
+      WHERE queue = $1::text
+            AND run_at <= now()
+            AND retryable = true
+            AND job_id >= $2
+            ORDER BY priority, run_at, job_id
+            LIMIT 1
+    }
   }
   # rubocop:enable Style/MutableConstant
 end

@@ -58,4 +58,6 @@ jobs:
           ruby-version: "${{ matrix.ruby-version }}"
       - name: Run specs
         run: |
-          bundle exec rspec 
+          bundle exec rspec
+      - name: Run Specs With YUAGBUTE_QUE_WORKER_ENABLED Enabled
+        run: YUAGBUTE_QUE_WORKER_ENABLED=true bundle exec rspec

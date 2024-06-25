@@ -31,20 +31,16 @@ end
 
 establish_database_connection
 
+
 class LockDatabaseRecord < ActiveRecord::Base
-  def self.establish_lock_database_connection
-    establish_connection(
+  establish_connection(
       adapter: "postgresql",
       host: ENV.fetch("LOCK_PGHOST", "localhost"),
       user: ENV.fetch("LOCK_PGUSER", "ubuntu"),
       password: ENV.fetch("LOCK_PGPASSWORD", "password"),
       database: ENV.fetch("LOCK_PGDATABASE", "lock-test"),
-      port: ENV.fetch("LOCK_PGPORT", 5434),
-    )
-  end
-  def self.connection
-    establish_lock_database_connection.connection
-  end
+      port: ENV.fetch("LOCK_PGPORT", 5435),
+      pool: 6,)
 end
 
 class YugabyteRecord < ActiveRecord::Base
@@ -85,9 +81,17 @@ RSpec.configure do |config|
   #   Que.adapter.cleanup!
   #   Que.connection = ActiveRecord
   # end
-  config.filter_run_when_matching :conditional_test if ENV['YUGABYTE_QUE_WORKER_ENABLED']
+  if  ENV['YUGABYTE_QUE_WORKER_ENABLED']
+    config.before(:all) do
+      Que.adapter.checkout_lock_database_connection
+    end
+    config.after(:all) do
+      LockDatabaseRecord.connection_pool.disconnect!
+    end
+  end
 
   config.before do
+    LockDatabaseRecord.connection_pool.release_connection
     QueJob.delete_all
     FakeJob.log = []
     ExceptionalJob.log = []

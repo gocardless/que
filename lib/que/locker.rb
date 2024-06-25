@@ -60,7 +60,6 @@ module Que
       @queue_expires_at = {}
       @secondary_queues = secondary_queues
       @consolidated_queues = Array.wrap(queue).concat(secondary_queues)
-
       # Create a bucket that has 100% capacity, so even when we don't apply a limit we
       # have a valid bucket that we can use everywhere
       @leaky_bucket = LeakyBucket.new(window: window || 1.0, budget: budget || 1.0)
@@ -121,7 +120,7 @@ module Que
     ensure
       if job
         observe(UnlockTotal, UnlockSecondsTotal, worked_queue: job[:queue]) do
-          Que.execute("SELECT pg_advisory_unlock($1)", [job[:job_id]])
+          Que.execute(:unlock_job, [job[:job_id]])
         end
       end
     end
@@ -155,9 +154,7 @@ module Que
     def handle_expired_cursors!
       @consolidated_queues.each do |queue|
         queue_cursor_expires_at = @queue_expires_at.fetch(queue, monotonic_now)       
-         
-
-        reset_cursor_for!(queue) if queue_cursor_expires_at <= monotonic_now
+        reset_cursor_for!(queue) if queue_cursor_expires_at < monotonic_now
       end
     end
 
