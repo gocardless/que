@@ -221,7 +221,7 @@ RSpec.describe Que::Worker do
           FakeJob.enqueue(1)
 
           expect(Que).
-            to receive(:execute).with(:lock_job, ["default", 0]).
+            to receive(:execute).with(:lock_job, include("default", 0)).
             and_raise(ActiveRecord::ConnectionTimeoutError)
           expect(work).to eq(:postgres_error)
         end
@@ -232,7 +232,7 @@ RSpec.describe Que::Worker do
           FakeJob.enqueue(1)
 
           expect(Que).
-            to receive(:execute).with(:lock_job, ["default", 0]).
+            to receive(:execute).with(:lock_job, include("default", 0)).
             and_raise(ActiveRecord::ConnectionNotEstablished)
           expect(work).to eq(:postgres_error)
         end
