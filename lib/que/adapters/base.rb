@@ -9,6 +9,7 @@ module Que
     autoload :PG,             "que/adapters/pg"
     autoload :Pond,           "que/adapters/pond"
     autoload :Sequel,         "que/adapters/sequel"
+    autoload :Yugabyte,        "que/adapters/yugabyte"
 
     class UnavailableConnection < StandardError; end
 

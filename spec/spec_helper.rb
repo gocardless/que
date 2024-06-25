@@ -13,6 +13,7 @@ require_relative "./helpers/que_job"
 require_relative "./helpers/sleep_job"
 require_relative "./helpers/interruptible_sleep_job"
 require_relative "./helpers/user"
+require_relative "../lib/que/adapters/yugabyte"
 
 def postgres_now
   ActiveRecord::Base.connection.execute("SELECT NOW();")[0]["now"]
@@ -22,20 +23,15 @@ def establish_database_connection
   ActiveRecord::Base.establish_connection(
     adapter: "postgresql",
     host: ENV.fetch("PGHOST", "localhost"),
-    user: ENV.fetch("PGUSER", "postgres"),
-    password: ENV.fetch("PGPASSWORD", ""),
+    user: ENV.fetch("PGUSER", "ubuntu"),
+    password: ENV.fetch("PGPASSWORD", "password"),
     database: ENV.fetch("PGDATABASE", "que-test"),
   )
 end
 
 establish_database_connection
 
-# Make sure our test database is prepared to run Que
-Que.connection = ActiveRecord
-Que.migrate!
-
-
-class LockDataBaseRecord < ActiveRecord::Base
+class LockDatabaseRecord < ActiveRecord::Base
   def self.establish_lock_database_connection
     establish_connection(
       adapter: "postgresql",
@@ -51,10 +47,46 @@ class LockDataBaseRecord < ActiveRecord::Base
   end
 end
 
+class YugabyteRecord < ActiveRecord::Base
+  def self.establish_lock_database_connection
+    establish_connection(
+      adapter: "postgresql",
+      host: ENV.fetch("PGHOST", "localhost"),
+      user: ENV.fetch("PGUSER", "ubuntu"),
+      password: ENV.fetch("PGPASSWORD", "password"),
+      database: ENV.fetch("PGDATABASE", "que-test"),
+    )
+  end
+  def self.connection
+    establish_lock_database_connection.connection
+  end
+end
+
+# Make sure our test database is prepared to run Que
+if ENV['YUGABYTE_QUE_WORKER_ENABLED']
+  Que.connection = Que::Adapters::Yugabyte
+else
+  Que.connection = ActiveRecord
+end
+
+Que.migrate!
+
 # Ensure we have a logger, so that we can test the code paths that log
 Que.logger = Logger.new("/dev/null")
 
+
 RSpec.configure do |config|
+  # config.before(:each, :with_yugabyte_adapter) do
+  #   Que.adapter.cleanup!
+  #   Que.connection = Que::Adapters::Yugabyte
+  # end
+  
+  # config.after(:each, :with_yugabyte_adapter) do
+  #   Que.adapter.cleanup!
+  #   Que.connection = ActiveRecord
+  # end
+  config.filter_run_when_matching :conditional_test if ENV['YUGABYTE_QUE_WORKER_ENABLED']
+
   config.before do
     QueJob.delete_all
     FakeJob.log = []

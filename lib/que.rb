@@ -61,6 +61,8 @@ module Que
       self.adapter =
         if connection.to_s == "ActiveRecord"
           Adapters::ActiveRecord.new
+        elsif connection.to_s == "Que::Adapters::Yugabyte"
+          Adapters::Yugabyte.new
         else
           case connection.class.to_s
           when "Sequel::Postgres::Database" then Adapters::Sequel.new(connection)
