@@ -9,6 +9,7 @@ module Que
     autoload :PG,             "que/adapters/pg"
     autoload :Pond,           "que/adapters/pond"
     autoload :Sequel,         "que/adapters/sequel"
+    autoload :ActiveRecordWithLock, "que/adapters/active_record_with_lock"
 
     class UnavailableConnection < StandardError; end
 
