@@ -61,10 +61,14 @@ module Que
       self.adapter =
         if connection.to_s == "ActiveRecord"
           Adapters::ActiveRecord.new
-        elsif connection.to_s == "Que::Adapters::Yugabyte"
-          Adapters::Yugabyte.new
         else
           case connection.class.to_s
+          when "Que::Adapters::ActiveRecordWithLock" then  
+
+            Adapters::ActiveRecordWithLock.new(
+              job_connection_pool: connection.job_connection_pool, 
+              lock_connection_pool: connection.lock_connection_pool
+            )
           when "Sequel::Postgres::Database" then Adapters::Sequel.new(connection)
           when "ConnectionPool"             then Adapters::ConnectionPool.new(connection)
           when "PG::Connection"             then Adapters::PG.new(connection)

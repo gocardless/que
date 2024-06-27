@@ -13,7 +13,7 @@ require_relative "./helpers/que_job"
 require_relative "./helpers/sleep_job"
 require_relative "./helpers/interruptible_sleep_job"
 require_relative "./helpers/user"
-require_relative "../lib/que/adapters/yugabyte"
+
 
 def postgres_now
   ActiveRecord::Base.connection.execute("SELECT NOW();")[0]["now"]
@@ -44,7 +44,6 @@ class LockDatabaseRecord < ActiveRecord::Base
 end
 
 class YugabyteRecord < ActiveRecord::Base
-  def self.establish_lock_database_connection
     establish_connection(
       adapter: "postgresql",
       host: ENV.fetch("PGHOST", "localhost"),
@@ -52,15 +51,14 @@ class YugabyteRecord < ActiveRecord::Base
       password: ENV.fetch("PGPASSWORD", "password"),
       database: ENV.fetch("PGDATABASE", "que-test"),
     )
-  end
-  def self.connection
-    establish_lock_database_connection.connection
-  end
 end
 
 # Make sure our test database is prepared to run Que
 if ENV['YUGABYTE_QUE_WORKER_ENABLED']
-  Que.connection = Que::Adapters::Yugabyte
+  Que.connection = Que::Adapters::ActiveRecordWithLock.new(
+                job_connection_pool: YugabyteRecord.connection_pool,
+                lock_connection_pool: LockDatabaseRecord.connection_pool,
+  )
 else
   Que.connection = ActiveRecord
 end
@@ -91,7 +89,6 @@ RSpec.configure do |config|
   end
 
   config.before do
-    LockDatabaseRecord.connection_pool.release_connection
     QueJob.delete_all
     FakeJob.log = []
     ExceptionalJob.log = []
