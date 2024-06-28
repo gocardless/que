@@ -44,15 +44,16 @@ module Que
         end
 
         def lock_job_with_lock_database(queue, cursor)            
-            result = Que.execute(:find_job_to_lock, [queue, cursor])
-            return result if result.empty?
-         
-             if pg_try_advisory_lock?(result.first['job_id'])
-                return result
-             end
-           
-            # continue the recursion to fetch the next available job
-            lock_job_with_lock_database(queue, result.first['job_id'])
+            result = []
+            loop do
+                result = Que.execute(:find_job_to_lock, [queue, cursor])
+                break if result.empty?
+                cursor = result.first['job_id']
+                if pg_try_advisory_lock?(cursor)
+                    break
+                 end
+            end
+            return result
         end
 
         def cleanup!
@@ -65,7 +66,7 @@ module Que
         end
 
         def unlock_job(job_id)
-           lock_database_connection.execute("SELECT pg_advisory_unlock(#{job_id})")
+            lock_database_connection.execute("SELECT pg_advisory_unlock(#{job_id})")
         end
       end
     end

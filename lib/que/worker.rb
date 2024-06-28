@@ -142,7 +142,7 @@ module Que
 
     def work_loop
       return if @stop
-      Que.adapter.checkout_lock_database_connection if ENV.fetch("YUGABYTE_QUE_WORKER_ENABLED", false)
+      Que.adapter.checkout_lock_database_connection if Que.adapter.class == Que::Adapters::ActiveRecordWithLock
       @tracer.trace(RunningSecondsTotal, queue: @queue, primary_queue: @queue) do
         loop do
           case event = work
@@ -161,7 +161,7 @@ module Que
           end
 
           if @stop
-            Que.adapter.release_lock_database_connection if ENV.fetch("YUGABYTE_QUE_WORKER_ENABLED", false)
+            Que.adapter.release_lock_database_connection if Que.adapter.class == Que::Adapters::ActiveRecordWithLock
             break
           end
         end
