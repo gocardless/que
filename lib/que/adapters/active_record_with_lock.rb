@@ -4,10 +4,10 @@
 module Que
     module Adapters
       class ActiveRecordWithLock < Que::Adapters::ActiveRecord
-        attr_accessor :job_connection_pool, :lock_connection_pool
-        def initialize(job_connection_pool:, lock_connection_pool:)
+        attr_accessor :job_connection_pool, :lock_connection
+        def initialize(job_connection_pool:, lock_connection:)
             @job_connection_pool = job_connection_pool
-            @lock_connection_pool = lock_connection_pool
+            @lock_connection = lock_connection
             super
         end
 
@@ -15,19 +15,8 @@ module Que
             @job_connection_pool.with_connection(&block)
         end
 
-        def checkout_lock_database_connection
-            # when multiple threads are running we need to make sure
-            # the acquiring and releasing of advisory locks is done by the 
-            # same connection
-            Thread.current[:db_connection] ||= lock_connection_pool.checkout
-        end
-
         def lock_database_connection
-            Thread.current[:db_connection]
-        end
-
-        def release_lock_database_connection
-            @lock_connection_pool.checkin(Thread.current[:db_connection])
+            Thread.current[:db_connection] ||= @lock_connection.connection
         end
 
         def execute(command, params=[])
@@ -58,7 +47,7 @@ module Que
 
         def cleanup!
             @job_connection_pool.release_connection
-            @lock_connection_pool.release_connection
+            @lock_connection.release_connection
         end
 
         def pg_try_advisory_lock?(job_id)

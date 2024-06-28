@@ -142,7 +142,7 @@ module Que
 
     def work_loop
       return if @stop
-      Que.adapter.checkout_lock_database_connection if Que.adapter.class == Que::Adapters::ActiveRecordWithLock
+
       @tracer.trace(RunningSecondsTotal, queue: @queue, primary_queue: @queue) do
         loop do
           case event = work
@@ -160,10 +160,7 @@ module Que
             nil # immediately find a new job to work
           end
 
-          if @stop
-            Que.adapter.release_lock_database_connection if Que.adapter.class == Que::Adapters::ActiveRecordWithLock
-            break
-          end
+          break if @stop
         end
       end
     ensure

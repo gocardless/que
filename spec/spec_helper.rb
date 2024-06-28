@@ -57,7 +57,7 @@ end
 if ENV['YUGABYTE_QUE_WORKER_ENABLED']
   Que.connection = Que::Adapters::ActiveRecordWithLock.new(
                 job_connection_pool: YugabyteRecord.connection_pool,
-                lock_connection_pool: LockDatabaseRecord.connection_pool,
+                lock_connection: LockDatabaseRecord,
   )
 else
   Que.connection = ActiveRecord
@@ -70,24 +70,6 @@ Que.logger = Logger.new("/dev/null")
 
 
 RSpec.configure do |config|
-  # config.before(:each, :with_yugabyte_adapter) do
-  #   Que.adapter.cleanup!
-  #   Que.connection = Que::Adapters::Yugabyte
-  # end
-  
-  # config.after(:each, :with_yugabyte_adapter) do
-  #   Que.adapter.cleanup!
-  #   Que.connection = ActiveRecord
-  # end
-  if  ENV['YUGABYTE_QUE_WORKER_ENABLED']
-    config.before(:all) do
-      Que.adapter.checkout_lock_database_connection
-    end
-    config.after(:all) do
-      LockDatabaseRecord.connection_pool.disconnect!
-    end
-  end
-
   config.before do
     QueJob.delete_all
     FakeJob.log = []

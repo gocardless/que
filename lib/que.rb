@@ -67,7 +67,7 @@ module Que
 
             Adapters::ActiveRecordWithLock.new(
               job_connection_pool: connection.job_connection_pool, 
-              lock_connection_pool: connection.lock_connection_pool
+              lock_connection: connection.lock_connection
             )
           when "Sequel::Postgres::Database" then Adapters::Sequel.new(connection)
           when "ConnectionPool"             then Adapters::ConnectionPool.new(connection)
