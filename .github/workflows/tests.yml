@@ -31,7 +31,7 @@ jobs:
       PGUSER: ubuntu
       PGPASSWORD: password
       PGHOST: localhost
-
+      BUNDLE_RUBYGEMS__PKG__GITHUB__COM: gocardless-robot-readonly:${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v3
       - name: Set up Ruby
