@@ -95,7 +95,10 @@ RSpec.describe Que::Locker do
           let(:cursor_expiry) { 5 }
 
           before do
-            # we need this to avoid flakiness during resetting the cursor
+            # we need this to avoid flakiness during resetting the cursor. 
+            # Cursors are reset in the beginning when the locker class object is created.
+            # It is reset in handle_expired_cursors! method. Sometimes the execution is fast enough that
+            # the condition to reset is not met because the Process.clock_gettime remains same(monotonic_now method).
             locker.instance_variable_get(:@queue_expires_at)[queue] = Process.clock_gettime(Process::CLOCK_MONOTONIC) + cursor_expiry
             allow(locker).to receive(:monotonic_now) { @epoch }
           end

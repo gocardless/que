@@ -4,7 +4,7 @@ require "spec_helper"
 
 RSpec.describe Que::Middleware::QueueCollector do
   subject(:collector) { described_class.new(->(_env) { nil }, options) }
-  let(:options) { {refresh_interval: 1.second} }
+  let(:options) { {refresh_interval: 0.1.second} }
   let(:now) { postgres_now }
   let(:due_now_delay) { 1000.0 }
   let(:due_later_than_now_delay) { due_now_delay / 2 }
