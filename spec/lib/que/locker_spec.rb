@@ -94,8 +94,11 @@ RSpec.describe Que::Locker do
         context "with non-zero cursor expiry" do
           let(:cursor_expiry) { 5 }
 
-          before { allow(locker).to receive(:monotonic_now) { @epoch } }
-
+          before do
+            # we need this to avoid flakiness during resetting the cursor
+            locker.instance_variable_get(:@queue_expires_at)[queue] = Process.clock_gettime(Process::CLOCK_MONOTONIC) + cursor_expiry
+            allow(locker).to receive(:monotonic_now) { @epoch }
+          end
           # This test simulates the repeated locking of jobs. We're trying to prove that
           # the locker will use the previous jobs ID as a cursor until the expiry has
           # elapsed, after which we'll reset.
