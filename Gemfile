@@ -23,6 +23,6 @@ end
 
 gem 'prometheus-client', '~> 1.0'
 source "https://rubygems.pkg.github.com/gocardless" do
-  gem "prometheus_gcstat", "0.1.1"
+  gem "prometheus_gcstat"
 end
 gemspec
