@@ -123,7 +123,6 @@ RSpec.describe Que::Locker do
             expect_to_work(job_2)
 
             @epoch += (cursor_expiry) # our cursor should now expire
-            # puts @epoch
             expect_to_lock_with(cursor: 0)
             expect_to_work(job_3)
           end

@@ -13,6 +13,7 @@ require_relative "./helpers/que_job"
 require_relative "./helpers/sleep_job"
 require_relative "./helpers/interruptible_sleep_job"
 require_relative "./helpers/user"
+require_relative "./active_record_with_lock_spec_helper"
 
 
 def postgres_now
@@ -31,37 +32,12 @@ end
 
 establish_database_connection
 
-
-class LockDatabaseRecord < ActiveRecord::Base
-  establish_connection(
-      adapter: "postgresql",
-      host: ENV.fetch("LOCK_PGHOST", "localhost"),
-      user: ENV.fetch("LOCK_PGUSER", "ubuntu"),
-      password: ENV.fetch("LOCK_PGPASSWORD", "password"),
-      database: ENV.fetch("LOCK_PGDATABASE", "lock-test"),
-      port: ENV.fetch("LOCK_PGPORT", 5435),
-      pool: 6,)
-end
-
-class YugabyteRecord < ActiveRecord::Base
-    establish_connection(
-      adapter: "postgresql",
-      host: ENV.fetch("PGHOST", "localhost"),
-      user: ENV.fetch("PGUSER", "ubuntu"),
-      password: ENV.fetch("PGPASSWORD", "password"),
-      database: ENV.fetch("PGDATABASE", "que-test"),
-    )
-end
-
 # Make sure our test database is prepared to run Que
-if ENV['YUGABYTE_QUE_WORKER_ENABLED']
-  Que.connection = Que::Adapters::ActiveRecordWithLock.new(
-                job_connection_pool: YugabyteRecord.connection_pool,
-                lock_connection: LockDatabaseRecord,
-  )
-else
-  Que.connection = ActiveRecord
-end
+Que.connection = 
+  case ENV["ADAPTER"]
+  when "ActiveRecordWithLock" then active_record_with_lock_adapter_connection
+  else ActiveRecord
+  end
 
 Que.migrate!
 

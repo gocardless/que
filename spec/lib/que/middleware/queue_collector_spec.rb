@@ -70,7 +70,6 @@ RSpec.describe Que::Middleware::QueueCollector do
       it "does not include old results that are no longer relevant" do
         # Populate metrics, check we have some counts
         collector.call({})
-        puts QueJob.all
         QueJob.delete_all
 
         collector.call({})
