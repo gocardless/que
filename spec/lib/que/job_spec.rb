@@ -5,6 +5,11 @@ require "spec_helper"
 RSpec.describe Que::Job do
   describe ".enqueue" do
     let(:run_at) { postgres_now }
+    let(:job_class) do
+      Class.new(described_class).tap do |klass|
+        stub_const("FooBarJob", klass)
+      end
+    end
 
     it "adds job to que_jobs table" do
       expect { described_class.enqueue(:hello, run_at: run_at) }.
@@ -41,7 +46,7 @@ RSpec.describe Que::Job do
         que_job_id: an_instance_of(Integer),
         queue: "default",
         priority: 100,
-        job_class: a_string_including("Class"),
+        job_class: "FooBarJob",
         retryable: true,
         run_at: run_at,
         args: [500, "gbp", "testing"],
@@ -49,7 +54,6 @@ RSpec.describe Que::Job do
         custom_log_2: "test-log",
       )
 
-      job_class = Class.new(described_class)
       job_class.custom_log_context ->(attrs) {
         {
           custom_log_1: attrs[:args][0],
@@ -57,6 +61,32 @@ RSpec.describe Que::Job do
         }
       }
       job_class.enqueue(500, :gbp, :testing, run_at: run_at)
+    end
+
+    it "instruments queries using ActiveSupport::Notifications" do
+      events = []
+
+      ActiveSupport::Notifications.subscribe("que.execute") do |event|
+        events << event
+      end
+
+      job_class.enqueue("foobar")
+
+      expect(events).to include(
+        having_attributes(
+          name: "que.execute",
+          payload: hash_including(
+            sql: /INSERT INTO que_jobs/,
+            name: "SQL",
+            binds: [nil, nil, nil, "FooBarJob", true, "[\"foobar\"]"],
+            type_casted_binds: [],
+            async: false,
+            statement_name: nil,
+            connection: instance_of(PG::Connection),
+            row_count: 1,
+          ),
+        ),
+      )
     end
 
     context "with a custom adapter specified" do

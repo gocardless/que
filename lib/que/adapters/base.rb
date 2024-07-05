@@ -13,8 +13,11 @@ module Que
     class UnavailableConnection < StandardError; end
 
     class Base
+      attr_reader :instrumenter
+
       def initialize(_thing = nil)
         @prepared_statements = {}
+        @instrumenter = nil
       end
 
       # The only method that adapters really need to implement. Should lock a
@@ -62,7 +65,14 @@ module Que
 
       def execute_sql(sql, params)
         args = params.empty? ? [sql] : [sql, params]
-        checkout { |conn| conn.async_exec(*args) }
+
+        checkout do |conn|
+          log(sql, conn, params, async: true) do |notification_payload|
+            conn.async_exec(*args).tap do |result|
+              notification_payload[:row_count] = result.count
+            end
+          end
+        end
       end
 
       def execute_prepared(name, params)
@@ -81,7 +91,11 @@ module Que
               prepared_just_now = statements[name] = true
             end
 
-            conn.exec_prepared("que_#{name}", params)
+            log(SQL[name], conn, params, async: false) do |notification_payload|
+              conn.exec_prepared("que_#{name}", params).tap do |result|
+                notification_payload[:row_count] = result.count
+              end
+            end
           rescue ::PG::InvalidSqlStatementName => e
             # Reconnections on ActiveRecord can cause the same connection
             # objects to refer to new backends, so recover as well as we can.
@@ -96,6 +110,24 @@ module Que
           end
         end
       end
+
+      # rubocop:disable Metrics/ParameterLists
+      def log(sql, conn, binds = [], type_casted_binds = [], name = "SQL", statement_name = nil, async: false, &block)
+        return yield({}) if instrumenter.nil?
+
+        instrumenter.instrument(
+          "que.execute",
+          sql: sql,
+          name: name,
+          binds: binds,
+          type_casted_binds: type_casted_binds,
+          async: async,
+          statement_name: statement_name,
+          connection: conn,
+          &block
+        )
+      end
+      # rubocop:enable Metrics/ParameterLists
 
       CAST_PROCS = {
         # booleans
