@@ -13,8 +13,6 @@ RSpec.describe Que::Locker do
   let(:queue) { "default" }
   let(:cursor_expiry) { 0 }
 
-
-
   describe ".with_locked_job" do
     before { allow(Que).to receive(:execute).and_call_original }
 
@@ -60,9 +58,6 @@ RSpec.describe Que::Locker do
     end
 
     context "with just one job to lock" do
-      before do
-        described_class.instance_variable_set(:@queue_cursors, [0])
-      end
       let!(:job_1) { FakeJob.enqueue(1, queue: queue, priority: 1).attrs }
       let(:cursor_expiry) { 60 }
 
@@ -122,7 +117,7 @@ RSpec.describe Que::Locker do
             expect_to_lock_with(cursor: job_1[:job_id])
             expect_to_work(job_2)
 
-            @epoch += (cursor_expiry) # our cursor should now expire
+            @epoch += cursor_expiry # our cursor should now expire
             expect_to_lock_with(cursor: 0)
             expect_to_work(job_3)
           end

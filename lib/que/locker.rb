@@ -153,7 +153,7 @@ module Que
 
     def handle_expired_cursors!
       @consolidated_queues.each do |queue|
-        queue_cursor_expires_at = @queue_expires_at.fetch(queue, monotonic_now)  
+        queue_cursor_expires_at = @queue_expires_at.fetch(queue, monotonic_now)
         reset_cursor_for!(queue) if queue_cursor_expires_at < monotonic_now
       end
     end
