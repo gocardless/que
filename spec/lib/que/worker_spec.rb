@@ -4,22 +4,22 @@ require "spec_helper"
 
 RSpec.describe Que::Worker do
   describe ".work" do
-    subject { described_class.new.work }
+    subject(:work) { described_class.new.work }
 
     it "returns job_not_found if there's no job to work" do
-      expect(subject).to eq(:job_not_found)
+      expect(work).to eq(:job_not_found)
     end
 
     context "when there's a job to work" do
       let!(:job) { FakeJob.enqueue(1) }
 
       it "works the job" do
-        expect(subject).to eq(:job_worked)
+        expect(work).to eq(:job_worked)
         expect(FakeJob.log).to eq([1])
         expect(QueJob.count).to eq(0)
       end
 
-      xit "logs the work without custom log context" do
+      it "logs the work without custom log context" do
         expect(Que.logger).to receive(:info).
           with(hash_including(
                  event: "que_job.job_begin",
@@ -31,7 +31,7 @@ RSpec.describe Que::Worker do
                  queue: "default",
                  primary_queue: "default",
                  que_job_id: job.attrs["job_id"],
-                 latency: an_instance_of(Float),
+                 latency: an_instance_of(BigDecimal),
                ))
 
         expect(Que.logger).to receive(:info).
@@ -47,12 +47,12 @@ RSpec.describe Que::Worker do
                  primary_queue: "default",
                  que_job_id: job.attrs["job_id"],
                ))
-        subject
+        work
       end
 
       context "with custom log context" do
         let!(:job) do
-          class FakeJobWithCustomLogs < FakeJob
+          klass = Class.new(FakeJob) do
             custom_log_context ->(attrs) {
               {
                 custom_log_1: attrs[:args][0],
@@ -62,10 +62,13 @@ RSpec.describe Que::Worker do
 
             @log = []
           end
+
+          stub_const("FakeJobWithCustomLogs", klass)
+
           FakeJobWithCustomLogs.enqueue(1)
         end
 
-        xit "logs the work with custom log context" do
+        it "logs the work with custom log context" do
           expect(Que.logger).to receive(:info).
             with(hash_including(
                    event: "que_job.job_begin",
@@ -77,7 +80,7 @@ RSpec.describe Que::Worker do
                    queue: "default",
                    primary_queue: "default",
                    que_job_id: job.attrs["job_id"],
-                   latency: an_instance_of(Float),
+                   latency: an_instance_of(BigDecimal),
                    custom_log_1: 1,
                    custom_log_2: "test-log",
                  ))
@@ -97,7 +100,7 @@ RSpec.describe Que::Worker do
                    custom_log_1: 1,
                    custom_log_2: "test-log",
                  ))
-          subject
+          work
         end
       end
     end
@@ -106,12 +109,12 @@ RSpec.describe Que::Worker do
       it "rescues it" do
         ExceptionalJob.enqueue(1)
 
-        expect(subject).to eq(:job_worked)
+        expect(work).to eq(:job_worked)
       end
 
       it "logs the work" do
-        class ExceptionalJobWithCustomLogging < ExceptionalJob
-          custom_log_context -> (attrs) {
+        klass = Class.new(ExceptionalJob) do
+          custom_log_context ->(attrs) {
             {
               first_arg: attrs[:args][0],
             }
@@ -119,6 +122,8 @@ RSpec.describe Que::Worker do
 
           @log = []
         end
+
+        stub_const("ExceptionalJobWithCustomLogging", klass)
 
         ExceptionalJobWithCustomLogging.enqueue(1)
 
@@ -128,7 +133,7 @@ RSpec.describe Que::Worker do
                  handler: "ExceptionalJobWithCustomLogging",
                  job_class: "ExceptionalJobWithCustomLogging",
                  msg: "Job acquired, beginning work",
-                 first_arg: 1
+                 first_arg: 1,
                ))
 
         expect(Que.logger).to receive(:error).
@@ -138,10 +143,10 @@ RSpec.describe Que::Worker do
                  job_class: "ExceptionalJobWithCustomLogging",
                  msg: "Job failed with error",
                  error: "#<ExceptionalJob::Error: bad argument 1>",
-                 first_arg: 1
+                 first_arg: 1,
                ))
 
-        subject
+        work
       end
 
       context "and the job has a failure handler" do
@@ -150,7 +155,7 @@ RSpec.describe Que::Worker do
         it "calls it" do
           job_class.enqueue(1)
 
-          expect(subject).to eq(:job_worked)
+          expect(work).to eq(:job_worked)
 
           expect(job_class.log.count).to eq(2)
           expect(job_class.log.first).to eq([:run, 1])
@@ -169,7 +174,7 @@ RSpec.describe Que::Worker do
         it "calls the default one" do
           job_class.enqueue("foo")
 
-          expect(subject).to eq(:job_worked)
+          expect(work).to eq(:job_worked)
 
           job = QueJob.first
 
@@ -191,7 +196,7 @@ RSpec.describe Que::Worker do
 
           Que.adapter.execute(:insert_job, [*job_options.values_at(*Que::Job::JOB_OPTIONS), []])
 
-          expect(subject).to eq(:job_worked)
+          expect(work).to eq(:job_worked)
 
           job = QueJob.first
 
@@ -207,7 +212,7 @@ RSpec.describe Que::Worker do
 
           expect(Que).
             to receive(:execute).with(:lock_job, ["default", 0]).and_raise(PG::Error)
-          expect(subject).to eq(:postgres_error)
+          expect(work).to eq(:postgres_error)
         end
       end
 
@@ -218,7 +223,7 @@ RSpec.describe Que::Worker do
           expect(Que).
             to receive(:execute).with(:lock_job, ["default", 0]).
             and_raise(ActiveRecord::ConnectionTimeoutError)
-          expect(subject).to eq(:postgres_error)
+          expect(work).to eq(:postgres_error)
         end
       end
 
@@ -229,7 +234,7 @@ RSpec.describe Que::Worker do
           expect(Que).
             to receive(:execute).with(:lock_job, ["default", 0]).
             and_raise(ActiveRecord::ConnectionNotEstablished)
-          expect(subject).to eq(:postgres_error)
+          expect(work).to eq(:postgres_error)
         end
       end
     end

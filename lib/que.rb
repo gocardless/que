@@ -42,7 +42,7 @@ module Que
   SYMBOLIZER = proc do |object|
     case object
     when Hash
-      object.keys.each do |key|
+      object.each_key do |key|
         object[key.to_sym] = SYMBOLIZER.call(object.delete(key))
       end
       object
@@ -145,11 +145,11 @@ module Que
           begin
             execute "BEGIN"
             yield
-          rescue StandardError => error
+          rescue StandardError => e
             raise
           ensure
             # Handle a raised error or a killed thread.
-            if error || Thread.current.status == "aborting"
+            if e || Thread.current.status == "aborting"
               execute "ROLLBACK"
             else
               execute "COMMIT"

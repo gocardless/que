@@ -6,7 +6,7 @@ require "que/version"
 
 Gem::Specification.new do |spec|
   spec.name          = "que"
-  spec.version       = Que::Version
+  spec.version       = Que::VERSION
   spec.authors       = ["Chris Hanks"]
   spec.email         = ["christopher.m.hanks@gmail.com"]
   spec.description   =
@@ -15,9 +15,9 @@ Gem::Specification.new do |spec|
   spec.homepage      = "https://github.com/chanks/que"
   spec.license       = "MIT"
 
+  spec.required_ruby_version = ">= 3.0"
   spec.files         = `git ls-files`.split($INPUT_RECORD_SEPARATOR)
   spec.executables   = ["que"]
-  spec.test_files    = spec.files.grep(%r{^(test|spec|features)/})
   spec.require_paths = ["lib"]
 
   # We're pointing to our own branch of the Prometheus Client.
@@ -31,4 +31,5 @@ Gem::Specification.new do |spec|
   spec.add_dependency "webrick", "~> 1.7"
 
   spec.add_runtime_dependency "activesupport"
+  spec.metadata["rubygems_mfa_required"] = "true"
 end

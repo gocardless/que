@@ -82,7 +82,7 @@ module Que
             end
 
             conn.exec_prepared("que_#{name}", params)
-          rescue ::PG::InvalidSqlStatementName => error
+          rescue ::PG::InvalidSqlStatementName => e
             # Reconnections on ActiveRecord can cause the same connection
             # objects to refer to new backends, so recover as well as we can.
 
@@ -92,7 +92,7 @@ module Que
               retry
             end
 
-            raise error
+            raise e
           end
         end
       end
@@ -102,7 +102,7 @@ module Que
         16 => ->(value) {
           case value
           when String then value == "t"
-          else !!value
+          else !value.nil?
           end
         },
         # bigint

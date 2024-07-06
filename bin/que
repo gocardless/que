@@ -13,7 +13,7 @@ $stdout.sync = true
 
 options = OpenStruct.new
 
-# rubocop:disable Metrics/LineLength
+# rubocop:disable Layout/LineLength
 OptionParser.new do |opts|
   opts.banner = "usage: que [options] file/to/require ..."
 
@@ -59,7 +59,7 @@ OptionParser.new do |opts|
 
   opts.on("-v", "--version", "Show Que version") do
     require "que"
-    $stdout.puts "Que version #{Que::Version}"
+    $stdout.puts "Que version #{Que::VERSION}"
     exit 0
   end
 
@@ -68,9 +68,9 @@ OptionParser.new do |opts|
     exit 0
   end
 end.parse!(ARGV)
-# rubocop:enable Metrics/LineLength
+# rubocop:enable Layout/LineLength
 
-if ARGV.length.zero?
+if ARGV.empty?
   $stdout.puts <<~OUTPUT
     You didn't include any Ruby files to require!
     Que needs to be able to load your application before it can process jobs.
@@ -92,9 +92,9 @@ wake_interval    = options.wake_interval || ENV["QUE_WAKE_INTERVAL"]&.to_f || Qu
 cursor_expiry    = options.cursor_expiry || wake_interval
 worker_count     = options.worker_count  || 1
 timeout          = options.timeout
-secondary_queues = options.secondary_queues  || []
+secondary_queues = options.secondary_queues || []
 
-Que.logger ||= Logger.new(STDOUT)
+Que.logger ||= Logger.new($stdout)
 
 begin
   Que.logger.level = Logger.const_get(log_level.upcase) if log_level

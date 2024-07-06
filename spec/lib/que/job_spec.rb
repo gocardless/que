@@ -56,7 +56,7 @@ RSpec.describe Que::Job do
           custom_log_2: "test-log",
         }
       }
-      job_class.enqueue(500, :gbp, :testing,  run_at: run_at)
+      job_class.enqueue(500, :gbp, :testing, run_at: run_at)
     end
 
     context "with a custom adapter specified" do
@@ -97,10 +97,11 @@ RSpec.describe Que::Job do
     (1..fake_args.keys.count).
       flat_map { |n| fake_args.keys.combination(n).to_a }.each do |arg_keys|
       context "with #{arg_keys.inspect}" do
-        let(:args) { Hash[arg_keys.zip(fake_args.values_at(*arg_keys))] }
+        let(:job_args) { { a_real_arg: true } }
+        let(:args) { arg_keys.zip(fake_args.values_at(*arg_keys)).to_h }
 
         it "handles them properly" do
-          described_class.enqueue(1, true, "foo", **{ a_real_arg: true }.merge(args))
+          described_class.enqueue(1, true, "foo", **job_args.merge(args))
           job = QueJob.last
 
           arg_keys.each do |key|
@@ -131,7 +132,7 @@ RSpec.describe Que::Job do
 
   describe ".adapter" do
     context "with an adapter specified" do
-      let(:custom_adapter) { double(Que::Adapters::Base) }
+      let(:custom_adapter) { instance_double(Que::Adapters::Base) }
       let(:job_with_adapter) { Class.new(described_class) }
 
       it "uses the correct adapter" do
@@ -211,7 +212,7 @@ RSpec.describe Que::Job do
     end
 
     it "returns a hash of keys constructed from the job attrs" do
-      job_class.custom_log_context -> (attrs) {
+      job_class.custom_log_context ->(attrs) {
         {
           first_argument: attrs[:args][0],
           second_argument: attrs[:args][1],

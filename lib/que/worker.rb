@@ -145,7 +145,7 @@ module Que
 
       @tracer.trace(RunningSecondsTotal, queue: @queue, primary_queue: @queue) do
         loop do
-          case event = work
+          case work
           when :postgres_error
             Que.logger&.info(event: "que.postgres_error", wake_interval: @wake_interval)
             @tracer.trace(SleepingSecondsTotal, queue: @queue, primary_queue: @queue) do
@@ -252,7 +252,7 @@ module Que
 
             # For compatibility with que-failure, we need to allow failure handlers to be
             # defined on the job class.
-            if klass&.respond_to?(:handle_job_failure)
+            if klass.respond_to?(:handle_job_failure)
               klass.handle_job_failure(e, job)
             else
               handle_job_failure(e, job)
@@ -302,7 +302,7 @@ module Que
     end
 
     def actual_job_class_name(class_name, args)
-      return args.first["job_class"] if /ActiveJob::QueueAdapters/.match?(class_name)
+      return args.first["job_class"] if class_name.include?("ActiveJob::QueueAdapters")
 
       class_name
     end

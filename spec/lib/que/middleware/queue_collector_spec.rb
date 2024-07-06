@@ -3,8 +3,9 @@
 require "spec_helper"
 
 RSpec.describe Que::Middleware::QueueCollector do
-  subject(:collector) { described_class.new(->(_env) { nil }, options) }
-  let(:options) { {refresh_interval: 0.1.second} }
+  subject(:collector) { described_class.new(->(_env) {}, options) }
+
+  let(:options) { { refresh_interval: 0.1.second } }
   let(:now) { postgres_now }
   let(:due_now_delay) { 1000.0 }
   let(:due_later_than_now_delay) { due_now_delay / 2 }
@@ -77,15 +78,15 @@ RSpec.describe Que::Middleware::QueueCollector do
       end
     end
 
-    context "when creating a collector" do 
-      let(:registry) { double(Prometheus::Client::Registry) }
-      let(:options) do 
+    context "when creating a collector" do
+      let(:registry) { instance_double(Prometheus::Client::Registry) }
+      let(:options) do
         {
-          registry: registry
+          registry: registry,
         }
       end
 
-      it "will register metrics" do 
+      it "will register metrics" do
         expect(registry).to receive(:register).with(described_class::Queued)
         expect(registry).to receive(:register).with(described_class::QueuedPastDue)
 

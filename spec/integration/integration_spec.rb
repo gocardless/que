@@ -3,6 +3,7 @@
 require "spec_helper"
 require "que/worker" # required to prevent autoload races
 
+# rubocop:disable RSpec/DescribeClass
 RSpec.describe "multiple workers" do
   def with_workers(num, stop_timeout: 5, secondary_queues: [], &block)
     Que::WorkerGroup.start(
@@ -150,3 +151,4 @@ RSpec.describe "multiple workers" do
     end
   end
 end
+# rubocop:enable RSpec/DescribeClass

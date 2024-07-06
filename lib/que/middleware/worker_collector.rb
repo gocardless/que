@@ -28,8 +28,7 @@ module Que
 
       private
 
-      # rubocop:disable Lint/HandleExceptions
-      # rubocop:disable Style/RedundantBegin
+      # rubocop:disable Style/RedundantBegin, Lint/SuppressedException
       def register(*metrics)
         begin
           metrics.each do |metric|
@@ -38,8 +37,7 @@ module Que
         rescue Prometheus::Client::Registry::AlreadyRegisteredError
         end
       end
-      # rubocop:enable Style/RedundantBegin
-      # rubocop:enable Lint/HandleExceptions
+      # rubocop:enable Style/RedundantBegin, Lint/SuppressedException
     end
   end
 end
