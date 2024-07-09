@@ -13,6 +13,11 @@ module Que
         ::PG::UnableToSend,
       ].freeze
 
+      def initialize(_thing = nil)
+        super
+        @instrumenter = ActiveSupport::Notifications.instrumenter
+      end
+
       def checkout
         checkout_activerecord_adapter { |conn| yield conn.raw_connection }
       rescue *AR_UNAVAILABLE_CONNECTION_ERRORS => e
