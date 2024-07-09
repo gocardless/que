@@ -4,6 +4,21 @@ on:
   push:
 
 jobs:
+  rubocop:
+    runs-on: ubuntu-latest
+    env:
+      BUNDLE_RUBYGEMS__PKG__GITHUB__COM: gocardless-robot-readonly:${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+          ruby-version: "3.0"
+      - name: Run rubocop
+        run: |
+          bundle exec rubocop --extra-details --display-style-guide --no-server --parallel
+
   rspec:
     strategy:
       fail-fast: false
@@ -33,7 +48,7 @@ jobs:
       PGHOST: localhost
       BUNDLE_RUBYGEMS__PKG__GITHUB__COM: gocardless-robot-readonly:${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:

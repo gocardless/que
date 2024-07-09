@@ -1,26 +1,27 @@
 inherit_gem:
   gc_ruboconfig: rubocop.yml
 
-AllCops:
-  Exclude: [legacy_spec/**/*]
+require:
+  - rubocop-performance
+  - rubocop-rake
+  - rubocop-rspec
+  - rubocop-sequel
 
-Metrics/MethodLength:
-  Max: 20
+AllCops:
+  NewCops: enable
+  Exclude:
+    - "vendor/**/*"
+    - "legacy_spec/**/*"
+    - "lib/generators/que/templates/*.rb"
 
 RSpec/MultipleExpectations:
-  Enabled: false
-
-RSpec/NestedGroups:
-  Max: 5
-
-RSpec/NamedSubject:
   Enabled: false
 
 RSpec/ExampleLength:
   Enabled: false
 
-RSpec/DescribeClass:
+RSpec/IndexedLet:
   Enabled: false
 
-Metrics/CyclomaticComplexity:
-  Max: 10
+RSpec/NestedGroups:
+  Max: 5

@@ -41,7 +41,6 @@ module Que
         end
       end
 
-      # rubocop:disable Metrics/AbcSize
       def call(env)
         # Reset all the previously observed values back to zero, ensuring we only ever
         # report metric values that are current in every scrape.
@@ -72,7 +71,6 @@ module Que
 
         @app.call(env)
       end
-      # rubocop:enable Metrics/AbcSize
 
       def refresh_materialized_view
         # Ensure generating metrics never take more than 5000ms to execute. If we can't

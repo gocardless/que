@@ -84,15 +84,17 @@ module Que
       if custom_proc.is_a?(Proc)
         self.log_context_proc = custom_proc
       else
-        raise ArgumentError.new "Custom log context must be a Proc " \
-                                "which receives the job as an argument and " \
-                                "returns a hash"
+        raise ArgumentError, "Custom log context must be a Proc " \
+                             "which receives the job as an argument and " \
+                             "returns a hash"
       end
     end
 
+    # rubocop:disable Naming/AccessorMethodName
     def get_custom_log_context
       self.class.log_context_proc&.call(@attrs) || {}
     end
+    # rubocop:enable Naming/AccessorMethodName
 
     # This is accepting JOB_OPTIONS and args as keyword parameters. In future we want to
     # set instance variables instead of using a grab bag of parameters, which would allow

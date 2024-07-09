@@ -56,11 +56,11 @@ module Que
 
     private
 
-    def catch_error(&block)
-      result = block.call
+    def catch_error
+      result = yield
       [result, nil]
-    rescue StandardError => err
-      [result, err]
+    rescue StandardError => e
+      [result, e]
     end
   end
 end

@@ -11,7 +11,11 @@ group :development, :test do
   gem 'pg', require: nil, platform: :ruby
   gem 'pg_jruby', require: nil, platform: :jruby
   gem 'pond', require: nil
-  gem 'rubocop'
+  gem 'rubocop', '~> 1.64.1'
+  gem 'rubocop-performance', '~> 1.21.1'
+  gem 'rubocop-rake', '~> 0.6.0'
+  gem 'rubocop-rspec', '~> 3.0.2'
+  gem 'rubocop-sequel', '~> 0.3.4'
   gem 'sequel', require: nil
 end
 

@@ -9,7 +9,7 @@ ActiveRecord::Base.establish_connection(adapter: "postgresql", dbname: "que-benc
 Que.connection = ActiveRecord
 Que.migrate!
 
-Que.logger = Logger.new(STDOUT)
+Que.logger = Logger.new($stdout)
 Que.logger.formatter = proc do |severity, datetime, _progname, payload|
   { ts: datetime, tid: Thread.current.object_id, level: severity }.
     merge(payload).to_json + "\n"

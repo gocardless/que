@@ -7,23 +7,25 @@ RSpec.describe Que::LeakyBucket do
 
   let(:window) { 5.0 }
   let(:budget) { 1.0 }
-  let(:clock)  { FakeClock.new }
+  let(:clock)  { fake_clock.new }
 
   # Provide a test clock interface, allowing the observations and sleeps made by the
   # bucket to advance test time.
-  FakeClock = Class.new do
-    def initialize
-      @now = 0.0
-    end
+  let(:fake_clock) do
+    Class.new do
+      def initialize
+        @now = 0.0
+      end
 
-    attr_reader :now
+      attr_reader :now
 
-    def sleep(duration)
-      @now += duration
-    end
+      def sleep(duration)
+        @now += duration
+      end
 
-    def advance(duration)
-      @now += duration
+      def advance(duration)
+        @now += duration
+      end
     end
   end
 
@@ -38,8 +40,8 @@ RSpec.describe Que::LeakyBucket do
           total_work += duration
           raise StandardError, "throwing" if error
         end
-      rescue StandardError => err
-        fail(err) unless error
+      rescue StandardError => e
+        raise(e) unless error
       end
     end
 
