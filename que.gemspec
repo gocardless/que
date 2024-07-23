@@ -27,8 +27,8 @@ Gem::Specification.new do |spec|
   # This is highly non ideal, but unless we properly fork, we have to do this for now.
   spec.add_dependency "prometheus-client"
 
-  spec.add_dependency "rack", "~> 2.0"
-  spec.add_dependency "webrick", "~> 1.7"
+  spec.add_dependency "rack", "~> 3.0"
+  spec.add_dependency "webrick", "~> 1.8"
 
   spec.add_runtime_dependency "activesupport"
   spec.metadata["rubygems_mfa_required"] = "true"
