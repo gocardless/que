@@ -19,6 +19,26 @@ jobs:
         run: |
           bundle exec rubocop --extra-details --display-style-guide --no-server --parallel
 
+  smoke_test:
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby_version: ["3.0", "3.1", "3.2", "3.3"]
+
+    runs-on: ubuntu-latest
+    env:
+      BUNDLE_RUBYGEMS__PKG__GITHUB__COM: gocardless-robot-readonly:${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+          ruby-version: "${{ matrix.ruby-version }}"
+      - name: Start bin/que
+        run: |
+          bin/que ./lib/que.rb --metrics-port=8080 --ci
+
   rspec:
     strategy:
       fail-fast: false
@@ -40,7 +60,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
-      
+
     env:
       PGDATABASE: que-test
       PGUSER: ubuntu

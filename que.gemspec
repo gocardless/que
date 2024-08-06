@@ -26,9 +26,11 @@ Gem::Specification.new do |spec|
   # instead, and in any other clients of `Que`.
   # This is highly non ideal, but unless we properly fork, we have to do this for now.
   spec.add_dependency "prometheus-client"
+  spec.add_dependency "prometheus_gcstat"
 
-  spec.add_dependency "rack", "~> 3.0"
-  spec.add_dependency "webrick", "~> 1.8"
+  spec.add_dependency "rack", ">= 2", "< 4"
+  spec.add_dependency "rackup"
+  spec.add_dependency "webrick"
 
   spec.add_runtime_dependency "activesupport"
   spec.metadata["rubygems_mfa_required"] = "true"

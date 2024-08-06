@@ -7,7 +7,13 @@ require "ostruct"
 require "que"
 require "rack"
 require "prometheus/middleware/exporter"
+require "prometheus_gcstat"
 require "webrick"
+
+if Rack.release[0] == "3"
+  # Required if using Rack 3.x
+  require "rackup"
+end
 
 $stdout.sync = true
 
@@ -66,6 +72,10 @@ OptionParser.new do |opts|
   opts.on("-h", "--help", "Show help text") do
     $stdout.puts opts
     exit 0
+  end
+
+  opts.on("--ci", "Don't wait for sigterm exit after boot") do
+    options.ci = true
   end
 end.parse!(ARGV)
 # rubocop:enable Layout/LineLength
@@ -150,15 +160,31 @@ if options.metrics_port
       end,
     )
 
-    Rack::Handler::WEBrick.run(
-      app,
-      Host: "0.0.0.0",
-      Port: options.metrics_port,
-      Logger: WEBrick::Log.new("/dev/null"),
-      AccessLog: [],
-    )
+    host = "0.0.0.0"
+    logger = WEBrick::Log.new("/dev/null")
+
+    if Rack.release[0] == "3"
+      Rackup::Handler::WEBrick.run(
+        app,
+        Host: host,
+        Port: options.metrics_port,
+        Logger: logger,
+        AccessLog: [],
+      )
+    else
+      Rack::Handler::WEBrick.run(
+        app,
+        Host: host,
+        Port: options.metrics_port,
+        Logger: logger,
+        AccessLog: [],
+      )
+    end
   end
 end
 
-wait_for_signals("INT", "TERM")
-worker_group.stop(timeout)
+# For a basic CI check we ensure the app boots etc
+unless options.ci
+  wait_for_signals("INT", "TERM")
+  worker_group.stop(timeout)
+end
