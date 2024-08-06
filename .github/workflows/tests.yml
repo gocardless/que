@@ -37,7 +37,7 @@ jobs:
           ruby-version: "${{ matrix.ruby-version }}"
       - name: Start bin/que
         run: |
-          bin/que ./lib/que.rb --metrics-port=8080 --ci
+          bundle exec bin/que ./lib/que.rb --metrics-port=8080 --ci
 
   rspec:
     strategy:
