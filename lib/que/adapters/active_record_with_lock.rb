@@ -5,6 +5,7 @@ module Que
   module Adapters
     class ActiveRecordWithLock < Que::Adapters::ActiveRecord
       LOCK_PREFIX = ENV["QUE_LOCK_PREFIX"] || 1111 # this is a random number
+
       def initialize(job_connection_pool:, lock_record:)
         @job_connection_pool = job_connection_pool
         @lock_record = lock_record
@@ -12,18 +13,13 @@ module Que
       end
 
       def checkout_activerecord_adapter(&block)
-        @job_connection_pool.with_connection(&block)
+        @lock_record.connection_pool.with_connection do
+          @job_connection_pool.with_connection(&block)
+        end
       end
 
       def lock_database_connection
-        if Thread.current[:db_connection]
-          return Thread.current[:db_connection] if Thread.current[:db_connection].active?
-        end
-        # We are storing this in thread variable here to make sure
-        # same connection is used to acquire and release the advisory locks.
-        # Advisory lock will not be released if any other connection from the
-        # pool tries to release the lock
-        Thread.current[:db_connection] = @lock_record.connection
+        @lock_record.connection
       end
 
       def execute(command, params = [])
