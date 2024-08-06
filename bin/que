@@ -106,6 +106,12 @@ secondary_queues = options.secondary_queues || []
 
 Que.logger ||= Logger.new($stdout)
 
+if options.ci
+  require "active_record"
+
+  Que.connection = ActiveRecord
+end
+
 begin
   Que.logger.level = Logger.const_get(log_level.upcase) if log_level
 rescue NameError
