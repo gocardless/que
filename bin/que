@@ -183,8 +183,10 @@ if options.metrics_port
   end
 end
 
-# For a basic CI check we ensure the app boots etc
+# For a basic CI check we just want to ensure the app boots so don't want to
+# block the main thread, so this will just exit immediately.
 unless options.ci
   wait_for_signals("INT", "TERM")
-  worker_group.stop(timeout)
 end
+
+worker_group.stop(timeout)
