@@ -7,7 +7,13 @@ require "ostruct"
 require "que"
 require "rack"
 require "prometheus/middleware/exporter"
+require "prometheus_gcstat"
 require "webrick"
+
+if Rack.release[0] == "3"
+  # Required if using Rack 3.x
+  require "rackup"
+end
 
 $stdout.sync = true
 
@@ -67,6 +73,10 @@ OptionParser.new do |opts|
     $stdout.puts opts
     exit 0
   end
+
+  opts.on("--ci", "Don't wait for sigterm exit after boot") do
+    options.ci = true
+  end
 end.parse!(ARGV)
 # rubocop:enable Layout/LineLength
 
@@ -95,6 +105,21 @@ timeout          = options.timeout
 secondary_queues = options.secondary_queues || []
 
 Que.logger ||= Logger.new($stdout)
+
+if options.ci
+  require "active_record"
+
+  ActiveRecord::Base.establish_connection(
+    adapter: "postgresql",
+    host: ENV.fetch("PGHOST", "localhost"),
+    user: ENV.fetch("PGUSER", "postgres"),
+    password: ENV.fetch("PGPASSWORD", ""),
+    database: ENV.fetch("PGDATABASE", "que-test"),
+  )
+
+  Que.connection = ActiveRecord
+  Que.migrate!
+end
 
 begin
   Que.logger.level = Logger.const_get(log_level.upcase) if log_level
@@ -150,15 +175,33 @@ if options.metrics_port
       end,
     )
 
-    Rack::Handler::WEBrick.run(
-      app,
-      Host: "0.0.0.0",
-      Port: options.metrics_port,
-      Logger: WEBrick::Log.new("/dev/null"),
-      AccessLog: [],
-    )
+    host = "0.0.0.0"
+    logger = WEBrick::Log.new("/dev/null")
+
+    if Rack.release[0] == "3"
+      Rackup::Handler::WEBrick.run(
+        app,
+        Host: host,
+        Port: options.metrics_port,
+        Logger: logger,
+        AccessLog: [],
+      )
+    else
+      Rack::Handler::WEBrick.run(
+        app,
+        Host: host,
+        Port: options.metrics_port,
+        Logger: logger,
+        AccessLog: [],
+      )
+    end
   end
 end
 
-wait_for_signals("INT", "TERM")
+# For a basic CI check we just want to ensure the app boots so don't want to
+# block the main thread, so this will just exit immediately.
+unless options.ci
+  wait_for_signals("INT", "TERM")
+end
+
 worker_group.stop(timeout)
