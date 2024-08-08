@@ -60,6 +60,7 @@ module Que
       @queue_expires_at = {}
       @secondary_queues = secondary_queues
       @consolidated_queues = Array.wrap(queue).concat(secondary_queues)
+
       # Create a bucket that has 100% capacity, so even when we don't apply a limit we
       # have a valid bucket that we can use everywhere
       @leaky_bucket = LeakyBucket.new(window: window || 1.0, budget: budget || 1.0)
