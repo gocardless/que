@@ -34,7 +34,7 @@ RSpec.describe Que::Locker do
       with_locked_job do |actual_job|
         expect(actual_job[:job_id]).to eql(job[:job_id])
         expect(Que).to receive(:execute).
-          with("SELECT pg_advisory_unlock($1)", [job[:job_id]])
+          with(:unlock_job, [job[:job_id]])
 
         # Destroy the job to simulate the behaviour of the queue, and allow our lock query
         # to discover new jobs.

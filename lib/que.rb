@@ -63,6 +63,7 @@ module Que
           Adapters::ActiveRecord.new
         else
           case connection.class.to_s
+          when "Que::Adapters::ActiveRecordWithLock" then connection
           when "Sequel::Postgres::Database" then Adapters::Sequel.new(connection)
           when "ConnectionPool"             then Adapters::ConnectionPool.new(connection)
           when "PG::Connection"             then Adapters::PG.new(connection)
