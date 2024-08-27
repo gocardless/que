@@ -18,6 +18,7 @@ module Que
         register(*WorkerGroup::METRICS)
         register(*Worker::METRICS)
         register(*Locker::METRICS)
+        register(*Adapters::ActiveRecordWithLock::METRICS)
       end
 
       def call(env)
