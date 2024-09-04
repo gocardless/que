@@ -44,6 +44,19 @@ Que.migrate!
 Que.logger = Logger.new("/dev/null")
 
 RSpec.configure do |config|
+  # Run only specific adapter files based on the adapter class
+  spec_dir = "./spec/lib"
+  # Construct the path for the adapter spec file
+  adapter_spec_class_path = File.join(spec_dir, "#{Que.adapter.class.to_s.underscore}_spec.rb")
+
+  # Exclude patterns for tests in the que/adapters directory
+  config.exclude_pattern = "**/que/adapters/*.rb"
+
+  # Require the adapter spec file if it exists
+  if File.exist?(adapter_spec_class_path)
+    require adapter_spec_class_path
+  end
+
   config.before do
     QueJob.delete_all
     FakeJob.log = []
@@ -55,5 +68,23 @@ RSpec.configure do |config|
     # prevent mis-matched metric labels from raising exceptions from the incompatible
     # configurations.
     Prometheus::Client.registry.instance_eval { @metrics.clear }
+  end
+end
+
+def with_workers(num, stop_timeout: 5, secondary_queues: [], &block)
+  Que::WorkerGroup.start(
+    num,
+    wake_interval: 0.01,
+    secondary_queues: secondary_queues,
+  ).tap(&block).stop(stop_timeout)
+end
+
+# Wait for a maximum of [timeout] seconds for all jobs to be worked
+def wait_for_jobs_to_be_worked(timeout: 10)
+  start = Time.now
+  loop do
+    break if QueJob.count == 0 || Time.now - start > timeout
+
+    sleep 0.1
   end
 end

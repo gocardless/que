@@ -184,6 +184,7 @@ module Que
             AND retryable = true
             AND job_id >= $2
             ORDER BY priority, run_at, job_id
+            FOR UPDATE SKIP LOCKED
             LIMIT 1
     },
   }

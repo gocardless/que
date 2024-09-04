@@ -5,24 +5,6 @@ require "que/worker" # required to prevent autoload races
 
 # rubocop:disable RSpec/DescribeClass
 RSpec.describe "multiple workers" do
-  def with_workers(num, stop_timeout: 5, secondary_queues: [], &block)
-    Que::WorkerGroup.start(
-      num,
-      wake_interval: 0.01,
-      secondary_queues: secondary_queues,
-    ).tap(&block).stop(stop_timeout)
-  end
-
-  # Wait for a maximum of [timeout] seconds for all jobs to be worked
-  def wait_for_jobs_to_be_worked(timeout: 10)
-    start = Time.now
-    loop do
-      break if QueJob.count == 0 || Time.now - start > timeout
-
-      sleep 0.1
-    end
-  end
-
   context "with one worker and many jobs" do
     it "works each job exactly once" do
       10.times.each { |i| FakeJob.enqueue(i) }

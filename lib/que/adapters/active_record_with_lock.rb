@@ -3,6 +3,20 @@
 module Que
   module Adapters
     class ActiveRecordWithLock < Que::Adapters::ActiveRecord
+      METRICS = [
+        FindJobSecondsTotal = Prometheus::Client::Counter.new(
+          :que_find_job_seconds_total,
+          docstring: "Seconds spent finding a job",
+          labels: %i[queue],
+        ),
+
+        FindJobHitTotal = Prometheus::Client::Counter.new(
+          :que_find_job_hit_total,
+          docstring: "total number of job hit and misses when acquiring a lock",
+          labels: %i[queue job_hit],
+        ),
+      ].freeze
+
       def initialize(job_connection_pool:, lock_connection_pool:)
         @job_connection_pool = job_connection_pool
         @lock_connection_pool = lock_connection_pool
@@ -32,17 +46,23 @@ module Que
         end
       end
 
+      # This method continues looping through the que_jobs table until it either
+      # locks a job successfully or determines that there are no jobs to process.
       def lock_job_with_lock_database(queue, cursor)
-        result = []
         loop do
-          result = Que.execute(:find_job_to_lock, [queue, cursor])
+          observe(duration_metric: FindJobSecondsTotal, labels: { queue: queue }) do
+            Que.transaction do
+              job_to_lock = Que.execute(:find_job_to_lock, [queue, cursor])
+              return job_to_lock if job_to_lock.empty?
 
-          break if result.empty?
+              cursor = job_to_lock.first["job_id"]
+              job_locked = pg_try_advisory_lock?(cursor)
 
-          cursor = result.first["job_id"]
-          break if pg_try_advisory_lock?(cursor)
+              observe(count_metric: FindJobHitTotal, labels: { queue: queue, job_hit: job_locked })
+              return job_to_lock if job_locked
+            end
+          end
         end
-        result
       end
 
       def pg_try_advisory_lock?(job_id)
@@ -62,6 +82,21 @@ module Que
         checkout_lock_database_connection do |conn|
           conn.execute("SELECT pg_advisory_unlock(#{job_id})")
         end
+      end
+
+      def observe(count_metric: nil, duration_metric: nil, labels: {})
+        now = monotonic_now
+        yield if block_given?
+      ensure
+        count_metric&.increment(labels: labels)
+        duration_metric&.increment(
+          by: monotonic_now - now,
+          labels: labels,
+        )
+      end
+
+      def monotonic_now
+        Process.clock_gettime(Process::CLOCK_MONOTONIC)
       end
     end
   end
