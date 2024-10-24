@@ -85,8 +85,26 @@ module Que
 
       private
 
-      def checkout_activerecord_adapter(&block)
-        ::ActiveRecord::Base.connection_pool.with_connection(&block)
+      def checkout_activerecord_adapter
+        ::ActiveRecord::Base.connection_pool.with_connection do |conn|
+          yield conn
+        rescue ::PG::Error, ::ActiveRecord::StatementInvalid => e
+          remove_dead_connections(e)
+          raise
+        end
+      end
+
+      def remove_dead_connections(exception)
+        # Cater for errors both from a raw connection or a connection adapter,
+        # since the calling code could use either.
+        cause = exception.is_a?(::PG::Error) ? exception : exception.cause
+
+        return unless cause.instance_of?(::PG::UnableToSend) ||
+          cause.instance_of?(::PG::ConnectionBad)
+
+        ::ActiveRecord::Base.connection_pool.connections.
+          filter { |conn| conn.owner == ActiveSupport::IsolatedExecutionState.context }.
+          each { |failed| failed.pool.remove(failed) }
       end
     end
   end

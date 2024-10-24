@@ -216,6 +216,31 @@ RSpec.describe Que::Worker do
         end
       end
 
+      context "when postgres raises a bad connection error while processing a job" do
+        before do
+          allow(Que).to receive(:execute).
+            with(:lock_job, ["default", 0]).
+            and_raise(PG::ConnectionBad)
+
+          # Ensure we don't have any currently leased connections, since in a thread
+          # using with_connection this would never be the case (but in specs it
+          # sometimes is).
+          pool.disconnect!
+        end
+
+        let(:pool) { ActiveRecord::Base.connection_pool }
+
+        it "rescues it and returns an error" do
+          FakeJob.enqueue(1)
+
+          expect(work).to eq(:postgres_error)
+        end
+
+        it "removes the connection from the connection pool" do
+          expect { work }.to_not change { pool.connections.count }.from(0)
+        end
+      end
+
       context "when we time out checking out a new connection" do
         it "rescues it and returns an error" do
           FakeJob.enqueue(1)
