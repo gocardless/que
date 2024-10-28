@@ -25,3 +25,7 @@ RSpec/IndexedLet:
 
 RSpec/NestedGroups:
   Max: 5
+
+Sequel/IrreversibleMigration:
+  Exclude:
+    - "**/*_spec.rb"
