@@ -4,16 +4,11 @@
 require "logger"
 require "optparse"
 require "ostruct"
-require "que"
-require "rack"
 require "prometheus/middleware/exporter"
 require "prometheus_gcstat"
-require "webrick"
-
-if Rack.release[0] == "3"
-  # Required if using Rack 3.x
-  require "rackup"
-end
+require "puma"
+require "que"
+require "rack"
 
 $stdout.sync = true
 
@@ -176,25 +171,14 @@ if options.metrics_port
     )
 
     host = "0.0.0.0"
-    logger = WEBrick::Log.new("/dev/null")
 
-    if Rack.release[0] == "3"
-      Rackup::Handler::WEBrick.run(
-        app,
-        Host: host,
-        Port: options.metrics_port,
-        Logger: logger,
-        AccessLog: [],
-      )
-    else
-      Rack::Handler::WEBrick.run(
-        app,
-        Host: host,
-        Port: options.metrics_port,
-        Logger: logger,
-        AccessLog: [],
-      )
-    end
+    Rack::Handler::Puma.run(
+      app,
+      Host: host,
+      Port: options.metrics_port,
+      Silent: false,
+      AccessLog: [],
+    )
   end
 end
 
