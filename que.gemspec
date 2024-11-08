@@ -29,6 +29,7 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency "puma"
   spec.add_dependency "rack", ">= 2", "< 4"
+  spec.add_dependency "rackup"
 
   spec.add_runtime_dependency "activesupport"
   spec.metadata["rubygems_mfa_required"] = "true"

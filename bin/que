@@ -9,6 +9,11 @@ require "prometheus_gcstat"
 require "puma"
 require "que"
 require "rack"
+USE_RACKUP = Rack.release.split(".")[0].to_i >= 3
+if USE_RACKUP
+  require "rackup"
+end
+require "rack/handler/puma"
 
 $stdout.sync = true
 
@@ -172,7 +177,14 @@ if options.metrics_port
 
     host = "0.0.0.0"
 
-    Rack::Handler::Puma.run(
+    handler =
+      if USE_RACKUP
+        Rackup::Handler::Puma
+      else
+        Rack::Handler::Puma
+      end
+
+    handler.run(
       app,
       Host: host,
       Port: options.metrics_port,
