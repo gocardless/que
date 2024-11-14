@@ -25,6 +25,14 @@ group :test do
   gem 'rspec', '~> 3.9'
 end
 
+rack_version = ENV['RACK_VERSION'] || "3.0"
+gem "rack", rack_version
+if Gem::Version.new(rack_version) < Gem::Version.new('3.0.0')
+  gem "rackup", "~> 1.0"
+else
+  gem "rackup", "~> 2.0"
+end
+
 gem 'prometheus-client', '~> 1.0'
 source "https://rubygems.pkg.github.com/gocardless" do
   gem "prometheus_gcstat"
