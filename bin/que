@@ -184,12 +184,15 @@ if options.metrics_port
         Rack::Handler::Puma
       end
 
+    pidfile_opts = Dir.exist?("./tmp/pids/") ? {} : { pidfile: nil }
+
     handler.run(
       app,
       Host: host,
       Port: options.metrics_port,
       Silent: false,
       AccessLog: [],
+      **pidfile_opts,
     )
   end
 end
