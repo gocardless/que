@@ -27,6 +27,7 @@ Gem::Specification.new do |spec|
   # This is highly non ideal, but unless we properly fork, we have to do this for now.
   spec.add_dependency "prometheus-client"
 
+  spec.add_dependency "ostruct"
   spec.add_dependency "puma"
   spec.add_dependency "rack", ">= 2", "< 4"
   spec.add_dependency "rackup"

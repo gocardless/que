@@ -9,7 +9,7 @@ require "prometheus_gcstat"
 require "puma"
 require "que"
 require "rack"
-USE_RACKUP = Rack.release.split(".")[0].to_i >= 3
+USE_RACKUP = Gem::Version.new(Rack.release) >= Gem::Version.new("3.0.0")
 if USE_RACKUP
   require "rackup"
 end
@@ -175,25 +175,20 @@ if options.metrics_port
       end,
     )
 
-    host = "0.0.0.0"
+    # Uses the Handler::Puma class to build the config and then we call Server directly
+    # instead of going through the Handler::Puma.run method. This is to prevent the Handler
+    # from trapping signals and which would prevent Que exiting cleanly.
+    # https://github.com/puma/puma/blob/master/lib/rack/handler/puma.rb
+    server_options = { Host: "0.0.0.0", Port: options.metrics_port, Silent: false, AccessLog: [] }
+    handler = USE_RACKUP ? Rackup::Handler::Puma : Rack::Handler::Puma
+    puma_config = handler.config(app, server_options)
+    puma_config.clamp
 
-    handler =
-      if USE_RACKUP
-        Rackup::Handler::Puma
-      else
-        Rack::Handler::Puma
-      end
+    log_writer = ::Puma::LogWriter.stdio
+    puma_config.options[:log_writer] = log_writer
+    log_writer.log "Starting metrics server on #{puma_config.options[:Host]}:#{puma_config.options[:Port]}"
 
-    pidfile_opts = Dir.exist?("./tmp/pids/") ? {} : { pidfile: nil }
-
-    handler.run(
-      app,
-      Host: host,
-      Port: options.metrics_port,
-      Silent: false,
-      AccessLog: [],
-      **pidfile_opts,
-    )
+    Puma::Server.new(app, nil, puma_config.options).run.join
   end
 end
 
