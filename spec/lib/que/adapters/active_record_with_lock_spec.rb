@@ -20,6 +20,8 @@ RSpec.describe Que::Adapters::ActiveRecordWithLock, :active_record_with_lock do
     end
 
     it "sets correct metric values" do
+      expect(JobRecord.connection_pool.db_config.env_name).to eq("default")
+      expect(LockDatabaseRecord.connection_pool.db_config.env_name).to eq("lock")
       expect(QueJob.count).to eq(10)
       with_workers(5) { wait_for_jobs_to_be_worked }
       expect(QueJob.count).to eq(0)

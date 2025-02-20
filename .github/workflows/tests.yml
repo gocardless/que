@@ -6,8 +6,6 @@ on:
 jobs:
   rubocop:
     runs-on: ubuntu-latest
-    env:
-      BUNDLE_RUBYGEMS__PKG__GITHUB__COM: gocardless-robot-readonly:${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up Ruby
@@ -46,7 +44,6 @@ jobs:
       PGUSER: ubuntu
       PGPASSWORD: password
       PGHOST: localhost
-      BUNDLE_RUBYGEMS__PKG__GITHUB__COM: gocardless-robot-readonly:${{ secrets.GITHUB_TOKEN }}
       RACK_VERSION: "${{ matrix.rack_version }}"
     steps:
       - uses: actions/checkout@v4
@@ -73,44 +70,7 @@ jobs:
           POSTGRES_USER: ubuntu
           POSTGRES_PASSWORD: password
         ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      PGDATABASE: que-test
-      PGUSER: ubuntu
-      PGPASSWORD: password
-      PGHOST: localhost
-      BUNDLE_RUBYGEMS__PKG__GITHUB__COM: gocardless-robot-readonly:${{ secrets.GITHUB_TOKEN }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          bundler-cache: true
-          ruby-version: "${{ matrix.ruby-version }}"
-      - name: Run specs
-        run: |
-          bundle exec rspec --exclude-pattern "spec/smoke_tests/**/*"
-
-  active_record_with_lock_adapter_rspec:
-    strategy:
-      fail-fast: false
-      matrix:
-        ruby_version: ["3.3", "3.4"]
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:14.2
-        env:
-          POSTGRES_DB: que-test
-          POSTGRES_USER: ubuntu
-          POSTGRES_PASSWORD: password
-        ports:
-          - 5432:5432
+          - 5435:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -123,7 +83,7 @@ jobs:
           POSTGRES_USER: ubuntu
           POSTGRES_PASSWORD: password
         ports:
-          - 5434:5432
+          - 5436:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -134,12 +94,12 @@ jobs:
       PGUSER: ubuntu
       PGPASSWORD: password
       PGHOST: localhost
-      BUNDLE_RUBYGEMS__PKG__GITHUB__COM: gocardless-robot-readonly:${{ secrets.GITHUB_TOKEN }}
+      PGPORT: 5435
       LOCK_PGDATABASE: lock-test
       LOCK_PGUSER: ubuntu
       LOCK_PGPASSWORD: password
       LOCK_PGHOST: localhost
-      ADAPTER: ActiveRecordWithLock
+      LOCK_PGPORT: 5436
     steps:
       - uses: actions/checkout@v4
       - name: Set up Ruby

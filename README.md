@@ -139,16 +139,7 @@ Note that running specs requires a running Postgres instance.
 To start the server in a docker container perform the following:
 
 ```
-docker run -p5432:5432 --env POSTGRES_USER=ubuntu --env POSTGRES_PASSWORD=password  --env POSTGRES_DB=que-test postgres:11.2
-```
-
-Now inform the test suite where Postgres is running using environment variables
-
-```
-export PGDATABASE=que-test
-export PGUSER=ubuntu
-export PGPASSWORD=password
-export PGHOST=localhost
+docker compose up -d --force-recreate
 ```
 
 A note on running specs - Que's worker system is multithreaded and therefore prone to race conditions (especially on interpreters without a global lock, like Rubinius or JRuby). As such, if you've touched that code, a single spec run passing isn't a guarantee that any changes you've made haven't introduced bugs. One thing I like to do before pushing changes is rerun the specs many times and watching for hangs. You can do this from the command line with something like:
