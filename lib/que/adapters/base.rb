@@ -79,11 +79,12 @@ module Que
           end
         end
 
-        cast_result
-        case command
-        when Symbol then execute_prepared(command, params)
-        when String then execute_sql(command, params)
-        end
+        cast_result(
+          case command
+          when Symbol then execute_prepared(command, params)
+          when String then execute_sql(command, params)
+          end,
+        )
       end
 
       def in_transaction?
