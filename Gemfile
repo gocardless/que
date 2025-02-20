@@ -34,7 +34,3 @@ group :test do
   gem 'pry-byebug'
   gem 'rspec', '~> 3.9'
 end
-
-source "https://rubygems.pkg.github.com/gocardless" do
-  gem "prometheus_gcstat"
-end
