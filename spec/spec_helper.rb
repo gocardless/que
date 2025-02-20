@@ -41,7 +41,7 @@ Que.connection =
 Que.migrate!
 
 # Ensure we have a logger, so that we can test the code paths that log
-Que.logger = Logger.new("/dev/null")
+Que.logger = Logger.new(File::NULL)
 
 RSpec.configure do |config|
   # Run only specific adapter files based on the adapter class

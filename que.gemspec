@@ -15,23 +15,20 @@ Gem::Specification.new do |spec|
   spec.homepage      = "https://github.com/chanks/que"
   spec.license       = "MIT"
 
-  spec.required_ruby_version = ">= 3.0"
+  spec.required_ruby_version = ">= 3.3"
   spec.files         = `git ls-files`.split($INPUT_RECORD_SEPARATOR)
   spec.executables   = ["que"]
   spec.require_paths = ["lib"]
 
-  # We're pointing to our own branch of the Prometheus Client.
-  # Ideally we'd do this in the `gemspec`, but you can't do that.
-  # Instead, we remove the version restriction from `gemspec` and add it to the `Gemfile`
-  # instead, and in any other clients of `Que`.
-  # This is highly non ideal, but unless we properly fork, we have to do this for now.
-  spec.add_dependency "prometheus-client"
-
+  spec.add_dependency "activesupport"
   spec.add_dependency "ostruct"
+  spec.add_dependency "prometheus-client"
   spec.add_dependency "puma"
   spec.add_dependency "rack", ">= 2", "< 4"
   spec.add_dependency "rackup"
 
-  spec.add_runtime_dependency "activesupport"
   spec.metadata["rubygems_mfa_required"] = "true"
+
+  # This is a fork of the Original Que gem, so we don't want to push it to rubygems
+  spec.metadata["allowed_push_host"] = nil
 end

@@ -184,7 +184,7 @@ if options.metrics_port
     puma_config = handler.config(app, server_options)
     puma_config.clamp
 
-    log_writer = ::Puma::LogWriter.stdio
+    log_writer = Puma::LogWriter.stdio
     puma_config.options[:log_writer] = log_writer
     log_writer.log "Starting metrics server on #{puma_config.options[:Host]}:#{puma_config.options[:Port]}"
 
