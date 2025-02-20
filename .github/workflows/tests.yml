@@ -20,6 +20,7 @@ jobs:
           bundle exec rubocop --extra-details --display-style-guide --no-server --parallel
 
   smoke_test:
+    timeout-minutes: 5
     strategy:
       fail-fast: false
       matrix:
@@ -54,9 +55,9 @@ jobs:
         with:
           bundler-cache: true
           ruby-version: "${{ matrix.ruby_version }}"
-      - name: Start bin/que
+      - name: Run smoke tests
         run: |
-          bundle exec bin/que ./lib/que.rb --metrics-port=8080 --ci
+          bundle exec rspec spec/smoke_tests/
 
   rspec:
     strategy:
@@ -93,7 +94,7 @@ jobs:
           ruby-version: "${{ matrix.ruby-version }}"
       - name: Run specs
         run: |
-          bundle exec rspec
+          bundle exec rspec --exclude-pattern "spec/smoke_tests/**/*"
 
   active_record_with_lock_adapter_rspec:
     strategy:
@@ -147,4 +148,4 @@ jobs:
           bundler-cache: true
           ruby-version: "${{ matrix.ruby-version }}"
       - name: Run Specs With ActiveRecordWithLock Adapter
-        run: bundle exec rspec
+        run: bundle exec rspec --exclude-pattern "spec/smoke_tests/**/*"

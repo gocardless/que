@@ -77,10 +77,6 @@ OptionParser.new do |opts|
     $stdout.puts opts
     exit 0
   end
-
-  opts.on("--ci", "Don't wait for sigterm exit after boot") do
-    options.ci = true
-  end
 end.parse!(ARGV)
 # rubocop:enable Layout/LineLength
 
@@ -109,21 +105,6 @@ timeout          = options.timeout
 secondary_queues = options.secondary_queues || []
 
 Que.logger ||= Logger.new($stdout)
-
-if options.ci
-  require "active_record"
-
-  ActiveRecord::Base.establish_connection(
-    adapter: "postgresql",
-    host: ENV.fetch("PGHOST", "localhost"),
-    user: ENV.fetch("PGUSER", "postgres"),
-    password: ENV.fetch("PGPASSWORD", ""),
-    database: ENV.fetch("PGDATABASE", "que-test"),
-  )
-
-  Que.connection = ActiveRecord
-  Que.migrate!
-end
 
 begin
   Que.logger.level = Logger.const_get(log_level.upcase) if log_level
@@ -192,16 +173,13 @@ if options.metrics_port
 
     log_writer = Puma::LogWriter.stdio
     puma_config.options[:log_writer] = log_writer
-    log_writer.log "Starting metrics server on #{puma_config.options[:Host]}:#{puma_config.options[:Port]}"
 
-    Puma::Server.new(app, nil, puma_config.options).run.join
+    Puma::Server.new(app, nil, puma_config.options).tap do |s|
+      s.binder.parse(puma_config.options[:binds], s.log_writer)
+    end.run.join
   end
 end
 
-# For a basic CI check we just want to ensure the app boots so don't want to
-# block the main thread, so this will just exit immediately.
-unless options.ci
-  wait_for_signals("INT", "TERM")
-end
+wait_for_signals("INT", "TERM")
 
 worker_group.stop(timeout)
