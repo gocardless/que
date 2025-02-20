@@ -30,5 +30,5 @@ Gem::Specification.new do |spec|
   spec.metadata["rubygems_mfa_required"] = "true"
 
   # This is a fork of the Original Que gem, so we don't want to push it to rubygems
-  spec.metadata["allowed_push_host"] = nil
+  spec.metadata["allowed_push_host"] = ""
 end
