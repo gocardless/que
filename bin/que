@@ -5,7 +5,11 @@ require "logger"
 require "optparse"
 require "ostruct"
 require "prometheus/middleware/exporter"
-require "prometheus_gcstat"
+begin
+  require "prometheus_gcstat"
+rescue LoadError
+  # If the gem is not available, we'll just skip it
+end
 require "puma"
 require "que"
 require "rack"
@@ -155,8 +159,10 @@ if options.metrics_port
 
     health_check = ->(_) { [200, {}, ["healthy"]] }
 
-    Prometheus::MemoryStats.
-      new(Prometheus::Client.registry).start(interval: 10.seconds, delay: 10.seconds)
+    if defined?(Prometheus::MemoryStats)
+      Prometheus::MemoryStats.
+        new(Prometheus::Client.registry).start(interval: 10.seconds, delay: 10.seconds)
+    end
 
     app = Rack::URLMap.new(
       "/" => Rack::Builder.new do
