@@ -6,6 +6,36 @@ require "que"
 require "rspec"
 require "active_record"
 
+ActiveRecord::Base.configurations = {
+  "default" => {
+    adapter: "postgresql",
+    host: ENV.fetch("PGHOST", "localhost"),
+    user: ENV.fetch("PGUSER", "postgres"),
+    password: ENV.fetch("PGPASSWORD", "password"),
+    database: ENV.fetch("PGDATABASE", "que-test"),
+    port: ENV.fetch("PGPORT", 5435),
+  },
+  "lock" => {
+    adapter: "postgresql",
+    host: ENV.fetch("LOCK_PGHOST", "localhost"),
+    user: ENV.fetch("LOCK_PGUSER", "postgres"),
+    password: ENV.fetch("LOCK_PGPASSWORD", "password"),
+    database: ENV.fetch("LOCK_PGDATABASE", "que-test-lock"),
+    port: ENV.fetch("LOCK_PGPORT", 5436),
+    pool: 5,
+  },
+}
+
+ActiveRecord::Base.configurations.configs_for(env_name: "default").each do |config|
+  ActiveRecord::Base.establish_connection(config)
+end
+
+ActiveRecord::Base.configurations.configs_for(env_name: "lock").each do |config|
+  ActiveRecord::Base.establish_connection(config)
+end
+
+ActiveRecord::Base.connects_to(database: { writing: :default, reading: :default })
+
 require_relative "helpers/create_user"
 require_relative "helpers/exceptional_job"
 require_relative "helpers/fake_job"
@@ -15,48 +45,16 @@ require_relative "helpers/interruptible_sleep_job"
 require_relative "helpers/user"
 require_relative "active_record_with_lock_spec_helper"
 
-def postgres_now
-  ActiveRecord::Base.connection.execute("SELECT NOW();")[0]["now"]
-end
-
-def establish_database_connection
-  ActiveRecord::Base.establish_connection(
-    adapter: "postgresql",
-    host: ENV.fetch("PGHOST", "localhost"),
-    user: ENV.fetch("PGUSER", "ubuntu"),
-    password: ENV.fetch("PGPASSWORD", "password"),
-    database: ENV.fetch("PGDATABASE", "que-test"),
-  )
-end
-
-establish_database_connection
-
 # Make sure our test database is prepared to run Que
-Que.connection =
-  case ENV["ADAPTER"]
-  when "ActiveRecordWithLock" then active_record_with_lock_adapter_connection
-  else ActiveRecord
-  end
+Que.connection = ActiveRecord
+default_adapter = Que.adapter
 
 Que.migrate!
 
 # Ensure we have a logger, so that we can test the code paths that log
-Que.logger = Logger.new("/dev/null")
+Que.logger = Logger.new(File::NULL)
 
 RSpec.configure do |config|
-  # Run only specific adapter files based on the adapter class
-  spec_dir = "./spec/lib"
-  # Construct the path for the adapter spec file
-  adapter_spec_class_path = File.join(spec_dir, "#{Que.adapter.class.to_s.underscore}_spec.rb")
-
-  # Exclude patterns for tests in the que/adapters directory
-  config.exclude_pattern = "**/que/adapters/*.rb"
-
-  # Require the adapter spec file if it exists
-  if File.exist?(adapter_spec_class_path)
-    require adapter_spec_class_path
-  end
-
   config.before do
     QueJob.delete_all
     FakeJob.log = []
@@ -68,6 +66,14 @@ RSpec.configure do |config|
     # prevent mis-matched metric labels from raising exceptions from the incompatible
     # configurations.
     Prometheus::Client.registry.instance_eval { @metrics.clear }
+  end
+
+  config.before do |example|
+    Que.adapter = if example.metadata[:active_record_with_lock]
+                    active_record_with_lock_adapter_connection
+                  else
+                    default_adapter
+                  end
   end
 end
 
@@ -87,4 +93,8 @@ def wait_for_jobs_to_be_worked(timeout: 10)
 
     sleep 0.1
   end
+end
+
+def postgres_now
+  ActiveRecord::Base.connection.execute("SELECT NOW();")[0]["now"]
 end

@@ -1,0 +1,18 @@
+services:
+  default_db:
+    image: postgres:14.2
+    environment:
+      POSTGRES_DB: que-test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - 5435:5432
+
+  lock_db:
+    image: postgres:14.2
+    environment:
+      POSTGRES_DB: que-test-lock
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - 5436:5432

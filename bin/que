@@ -5,11 +5,15 @@ require "logger"
 require "optparse"
 require "ostruct"
 require "prometheus/middleware/exporter"
-require "prometheus_gcstat"
+begin
+  require "prometheus_gcstat"
+rescue LoadError
+  # If the gem is not available, we'll just skip it
+end
 require "puma"
 require "que"
 require "rack"
-USE_RACKUP = Rack.release.split(".")[0].to_i >= 3
+USE_RACKUP = Gem::Version.new(Rack.release) >= Gem::Version.new("3.0.0")
 if USE_RACKUP
   require "rackup"
 end
@@ -73,10 +77,6 @@ OptionParser.new do |opts|
     $stdout.puts opts
     exit 0
   end
-
-  opts.on("--ci", "Don't wait for sigterm exit after boot") do
-    options.ci = true
-  end
 end.parse!(ARGV)
 # rubocop:enable Layout/LineLength
 
@@ -105,21 +105,6 @@ timeout          = options.timeout
 secondary_queues = options.secondary_queues || []
 
 Que.logger ||= Logger.new($stdout)
-
-if options.ci
-  require "active_record"
-
-  ActiveRecord::Base.establish_connection(
-    adapter: "postgresql",
-    host: ENV.fetch("PGHOST", "localhost"),
-    user: ENV.fetch("PGUSER", "postgres"),
-    password: ENV.fetch("PGPASSWORD", ""),
-    database: ENV.fetch("PGDATABASE", "que-test"),
-  )
-
-  Que.connection = ActiveRecord
-  Que.migrate!
-end
 
 begin
   Que.logger.level = Logger.const_get(log_level.upcase) if log_level
@@ -155,8 +140,10 @@ if options.metrics_port
 
     health_check = ->(_) { [200, {}, ["healthy"]] }
 
-    Prometheus::MemoryStats.
-      new(Prometheus::Client.registry).start(interval: 10.seconds, delay: 10.seconds)
+    if defined?(Prometheus::MemoryStats)
+      Prometheus::MemoryStats.
+        new(Prometheus::Client.registry).start(interval: 10.seconds, delay: 10.seconds)
+    end
 
     app = Rack::URLMap.new(
       "/" => Rack::Builder.new do
@@ -175,32 +162,24 @@ if options.metrics_port
       end,
     )
 
-    host = "0.0.0.0"
+    # Uses the Handler::Puma class to build the config and then we call Server directly
+    # instead of going through the Handler::Puma.run method. This is to prevent the Handler
+    # from trapping signals and which would prevent Que exiting cleanly.
+    # https://github.com/puma/puma/blob/master/lib/rack/handler/puma.rb
+    server_options = { Host: "0.0.0.0", Port: options.metrics_port, Silent: false, AccessLog: [] }
+    handler = USE_RACKUP ? Rackup::Handler::Puma : Rack::Handler::Puma
+    puma_config = handler.config(app, server_options)
+    puma_config.clamp
 
-    handler =
-      if USE_RACKUP
-        Rackup::Handler::Puma
-      else
-        Rack::Handler::Puma
-      end
+    log_writer = Puma::LogWriter.stdio
+    puma_config.options[:log_writer] = log_writer
 
-    pidfile_opts = Dir.exist?("./tmp/pids/") ? {} : { pidfile: nil }
-
-    handler.run(
-      app,
-      Host: host,
-      Port: options.metrics_port,
-      Silent: false,
-      AccessLog: [],
-      **pidfile_opts,
-    )
+    Puma::Server.new(app, nil, puma_config.options).tap do |s|
+      s.binder.parse(puma_config.options[:binds], s.log_writer)
+    end.run.join
   end
 end
 
-# For a basic CI check we just want to ensure the app boots so don't want to
-# block the main thread, so this will just exit immediately.
-unless options.ci
-  wait_for_signals("INT", "TERM")
-end
+wait_for_signals("INT", "TERM")
 
 worker_group.stop(timeout)

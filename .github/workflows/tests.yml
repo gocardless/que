@@ -3,18 +3,16 @@ name: tests
 on:
   push:
 
-jobs:    
+jobs:
   rubocop:
     runs-on: ubuntu-latest
-    env:
-      BUNDLE_RUBYGEMS__PKG__GITHUB__COM: gocardless-robot-readonly:${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
           bundler-cache: true
-          ruby-version: "3.0"
+          ruby-version: "3.3"
       - name: Run rubocop
         run: |
           bundle exec rubocop --extra-details --display-style-guide --no-server --parallel
@@ -23,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ruby_version: ["3.0", "3.1", "3.2", "3.3"]
+        ruby_version: ["3.3", "3.4"]
         rack_version: ["2.2.5", "3.1"]
     runs-on: ubuntu-latest
     services:
@@ -34,82 +32,7 @@ jobs:
           POSTGRES_USER: ubuntu
           POSTGRES_PASSWORD: password
         ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      PGDATABASE: que-test
-      PGUSER: ubuntu
-      PGPASSWORD: password
-      PGHOST: localhost
-      BUNDLE_RUBYGEMS__PKG__GITHUB__COM: gocardless-robot-readonly:${{ secrets.GITHUB_TOKEN }}
-      RACK_VERSION: "${{ matrix.rack_version }}"
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          bundler-cache: true
-          ruby-version: "${{ matrix.ruby_version }}"
-      - name: Start bin/que
-        run: |
-          bundle exec bin/que ./lib/que.rb --metrics-port=8080 --ci
-
-  rspec:
-    strategy:
-      fail-fast: false
-      matrix:
-        ruby_version: ["3.0", "3.1", "3.2", "3.3"]
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:14.2
-        env:
-          POSTGRES_DB: que-test
-          POSTGRES_USER: ubuntu
-          POSTGRES_PASSWORD: password
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      PGDATABASE: que-test
-      PGUSER: ubuntu
-      PGPASSWORD: password
-      PGHOST: localhost
-      BUNDLE_RUBYGEMS__PKG__GITHUB__COM: gocardless-robot-readonly:${{ secrets.GITHUB_TOKEN }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          bundler-cache: true
-          ruby-version: "${{ matrix.ruby-version }}"
-      - name: Run specs
-        run: |
-          bundle exec rspec
-
-  active_record_with_lock_adapter_rspec:
-    strategy:
-      fail-fast: false
-      matrix:
-        ruby_version: ["3.0", "3.1", "3.2", "3.3"]
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:14.2
-        env:
-          POSTGRES_DB: que-test
-          POSTGRES_USER: ubuntu
-          POSTGRES_PASSWORD: password
-        ports:
-          - 5432:5432
+          - 5435:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -122,23 +45,80 @@ jobs:
           POSTGRES_USER: ubuntu
           POSTGRES_PASSWORD: password
         ports:
-          - 5434:5432
+          - 5436:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
-          --health-retries 10   
+          --health-retries 10
     env:
       PGDATABASE: que-test
       PGUSER: ubuntu
       PGPASSWORD: password
       PGHOST: localhost
-      BUNDLE_RUBYGEMS__PKG__GITHUB__COM: gocardless-robot-readonly:${{ secrets.GITHUB_TOKEN }}
+      PGPORT: 5435
       LOCK_PGDATABASE: lock-test
       LOCK_PGUSER: ubuntu
       LOCK_PGPASSWORD: password
       LOCK_PGHOST: localhost
-      ADAPTER: ActiveRecordWithLock
+      LOCK_PGPORT: 5436
+      RACK_VERSION: "${{ matrix.rack_version }}"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+          ruby-version: "${{ matrix.ruby_version }}"
+      - name: Run smoke tests
+        run: |
+          bundle exec rspec spec/smoke_tests/
+
+  rspec:
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby_version: ["3.3", "3.4"]
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14.2
+        env:
+          POSTGRES_DB: que-test
+          POSTGRES_USER: ubuntu
+          POSTGRES_PASSWORD: password
+        ports:
+          - 5435:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      lock_database:
+        image: postgres:14.2
+        env:
+          POSTGRES_DB: lock-test
+          POSTGRES_USER: ubuntu
+          POSTGRES_PASSWORD: password
+        ports:
+          - 5436:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGDATABASE: que-test
+      PGUSER: ubuntu
+      PGPASSWORD: password
+      PGHOST: localhost
+      PGPORT: 5435
+      LOCK_PGDATABASE: lock-test
+      LOCK_PGUSER: ubuntu
+      LOCK_PGPASSWORD: password
+      LOCK_PGHOST: localhost
+      LOCK_PGPORT: 5436
     steps:
       - uses: actions/checkout@v4
       - name: Set up Ruby
@@ -147,5 +127,4 @@ jobs:
           bundler-cache: true
           ruby-version: "${{ matrix.ruby-version }}"
       - name: Run Specs With ActiveRecordWithLock Adapter
-        run:  bundle exec rspec
-
+        run: bundle exec rspec --exclude-pattern "spec/smoke_tests/**/*"

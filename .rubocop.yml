@@ -1,14 +1,17 @@
 inherit_gem:
   gc_ruboconfig: rubocop.yml
 
-require:
+plugins:
+  - rubocop-rspec
   - rubocop-performance
   - rubocop-rake
-  - rubocop-rspec
+
+require:
   - rubocop-sequel
 
 AllCops:
   NewCops: enable
+  TargetRubyVersion: 3.3
   Exclude:
     - "vendor/**/*"
     - "legacy_spec/**/*"

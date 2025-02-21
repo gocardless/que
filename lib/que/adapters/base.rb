@@ -16,6 +16,34 @@ module Que
     class Base
       attr_reader :instrumenter
 
+      CAST_PROCS = {
+        # booleans
+        16 => ->(value) {
+          case value
+          when String then value == "t"
+          else !value.nil?
+          end
+        },
+        # bigint
+        20 => proc(&:to_i),
+        # smallint
+        21 => proc(&:to_i),
+        # integer
+        23 => proc(&:to_i),
+        # json
+        114 => ->(value) { JSON_MODULE.load(value, create_additions: false) },
+        # float
+        701 => proc(&:to_f),
+        # timestamp with time zone
+        1184 => ->(value) {
+          case value
+          when Time then value
+          when String then Time.parse(value)
+          else raise "Unexpected time class: #{value.class} (#{value.inspect})"
+          end
+        },
+      }.freeze
+
       def initialize(_thing = nil)
         @prepared_statements = {}
         @instrumenter = nil
@@ -51,11 +79,12 @@ module Que
           end
         end
 
-        cast_result \
+        cast_result(
           case command
           when Symbol then execute_prepared(command, params)
           when String then execute_sql(command, params)
-          end
+          end,
+        )
       end
 
       def in_transaction?
@@ -129,34 +158,6 @@ module Que
         )
       end
       # rubocop:enable Metrics/ParameterLists
-
-      CAST_PROCS = {
-        # booleans
-        16 => ->(value) {
-          case value
-          when String then value == "t"
-          else !value.nil?
-          end
-        },
-        # bigint
-        20 => proc(&:to_i),
-        # smallint
-        21 => proc(&:to_i),
-        # integer
-        23 => proc(&:to_i),
-        # json
-        114 => ->(value) { JSON_MODULE.load(value, create_additions: false) },
-        # float
-        701 => proc(&:to_f),
-        # timestamp with time zone
-        1184 => ->(value) {
-          case value
-          when Time then value
-          when String then Time.parse(value)
-          else raise "Unexpected time class: #{value.class} (#{value.inspect})"
-          end
-        },
-      }.freeze
 
       def cast_result(result)
         output = result.to_a
