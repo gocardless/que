@@ -26,6 +26,9 @@ module Que
       def checkout_activerecord_adapter(&block)
         checkout_lock_database_connection do
           @job_connection_pool.with_connection(&block)
+        rescue ::PG::Error, ::ActiveRecord::StatementInvalid => e
+          remove_dead_connections(e)
+          raise
         end
       end
 
