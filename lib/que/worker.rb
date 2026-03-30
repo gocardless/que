@@ -129,6 +129,7 @@ module Que
       @stop = false # instruct worker to stop
       @stopped = false # mark worker as having stopped
       @current_running_job = nil
+      @last_work_result = nil
       @locker = Locker.new(
         queue: queue,
         cursor_expiry: lock_cursor_expiry,
@@ -170,7 +171,7 @@ module Que
     def work
       Que.adapter.checkout do
         @locker.with_locked_job do |job|
-          return :job_not_found if job.nil?
+          return (@last_work_result = :job_not_found) if job.nil?
 
           log_keys = {
             priority: job["priority"],
@@ -258,13 +259,13 @@ module Que
               handle_job_failure(e, job)
             end
           end
-          :job_worked
+          @last_work_result = :job_worked
         end
       end
     rescue PG::Error, Adapters::UnavailableConnection => _e
       # In the event that our Postgres connection is bad, we don't want that error to halt
       # the work loop. Instead, we should let the work loop sleep and retry.
-      :postgres_error
+      @last_work_result = :postgres_error
     end
 
     # rubocop:enable Metrics/MethodLength
@@ -275,6 +276,10 @@ module Que
 
     def stopped?
       @stopped
+    end
+
+    def healthy?
+      @last_work_result != :postgres_error
     end
 
     def collect_metrics

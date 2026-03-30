@@ -264,4 +264,42 @@ RSpec.describe Que::Worker do
       end
     end
   end
+
+  describe "#healthy?" do
+    subject(:worker) { described_class.new }
+
+    it "is true before the worker has done any work" do
+      expect(worker).to be_healthy
+    end
+
+    it "is true when no job is found" do
+      worker.work
+      expect(worker).to be_healthy
+    end
+
+    it "is true after successfully working a job" do
+      FakeJob.enqueue(1)
+      worker.work
+      expect(worker).to be_healthy
+    end
+
+    it "is false after a postgres error" do
+      FakeJob.enqueue(1)
+      expect(Que).
+        to receive(:execute).with(:lock_job, ["default", 0]).and_raise(PG::Error)
+      worker.work
+      expect(worker).to_not be_healthy
+    end
+
+    it "recovers once work succeeds after a postgres error" do
+      expect(Que).
+        to receive(:execute).with(:lock_job, ["default", 0]).and_raise(PG::Error)
+      worker.work
+      expect(worker).to_not be_healthy
+
+      allow(Que).to receive(:execute).with(:lock_job, ["default", 0]).and_return([])
+      worker.work # no job found, returns :job_not_found
+      expect(worker).to be_healthy
+    end
+  end
 end

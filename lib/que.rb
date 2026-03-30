@@ -14,6 +14,7 @@ require_relative "que/worker"
 require_relative "que/worker_group"
 require_relative "que/middleware/worker_collector"
 require_relative "que/middleware/queue_collector"
+require_relative "que/middleware/worker_health_check"
 
 module Que
   begin

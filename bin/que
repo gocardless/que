@@ -138,7 +138,7 @@ if options.metrics_port
       port: options.metrics_port,
     )
 
-    health_check = ->(_) { [200, {}, ["healthy"]] }
+    health_check = Que::Middleware::WorkerHealthCheck.new(worker_group)
 
     if defined?(Prometheus::MemoryStats)
       Prometheus::MemoryStats.
