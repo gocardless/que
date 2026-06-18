@@ -53,10 +53,12 @@ module Que
       ),
     ].freeze
 
-    def initialize(queue:, cursor_expiry:, window: nil, budget: nil, secondary_queues: [])
+    def initialize(queue:, cursor_expiry:, window: nil, budget: nil, secondary_queues: [], run_at_cursor: false)
       @queue = queue
       @cursor_expiry = cursor_expiry
+      @run_at_cursor = run_at_cursor
       @queue_cursors = {}
+      @queue_run_at_cursors = {}
       @queue_expires_at = {}
       @secondary_queues = secondary_queues
       @consolidated_queues = Array.wrap(queue).concat(secondary_queues)
@@ -116,6 +118,7 @@ module Que
       return if job && !exists?(job)
 
       @queue_cursors[job[:queue]] = job[:job_id] if job
+      @queue_run_at_cursors[job[:queue]] = job[:run_at] if job && @run_at_cursor
 
       yield job
     ensure
@@ -149,7 +152,8 @@ module Que
     end
 
     def lock_job_query(queue, cursor)
-      Que.execute(:lock_job, [queue, cursor]).first
+      run_at = @queue_run_at_cursors.fetch(queue, '-infinity')
+      Que.execute(:lock_job, [queue, cursor, run_at]).first
     end
 
     def handle_expired_cursors!
@@ -161,6 +165,7 @@ module Que
 
     def reset_cursor_for!(queue)
       @queue_cursors[queue] = 0
+      @queue_run_at_cursors[queue] = '-infinity'
       @queue_expires_at[queue] = monotonic_now + @cursor_expiry
     end
 

@@ -43,13 +43,13 @@ RSpec.describe Que::Locker do
     end
 
     # Our tests are very concerned with which cursor we use and when
-    def expect_to_lock_with(cursor:)
-      expect(Que).to receive(:execute).with(:lock_job, [queue, cursor])
+    def expect_to_lock_with(cursor:, run_at_cursor: '-infinity')
+      expect(Que).to receive(:execute).with(:lock_job, [queue, cursor, run_at_cursor])
     end
 
     context "with no jobs to lock" do
       it "scans entire table and calls block with nil job" do
-        expect(Que).to receive(:execute).with(:lock_job, [queue, 0])
+        expect(Que).to receive(:execute).with(:lock_job, [queue, 0, '-infinity'])
 
         with_locked_job do |job|
           expect(job).to be_nil
@@ -127,6 +127,56 @@ RSpec.describe Que::Locker do
       end
       # rubocop:enable RSpec/SubjectStub
       # rubocop:enable RSpec/InstanceVariable
+    end
+
+    context "with run_at_cursor enabled" do
+      subject(:locker) do
+        described_class.new(queue: queue, cursor_expiry: 60, run_at_cursor: true)
+      end
+
+      let!(:job_1) { FakeJob.enqueue(1, queue: queue, priority: 1).attrs }
+      let!(:job_2) { FakeJob.enqueue(2, queue: queue, priority: 2).attrs }
+
+      before do
+        allow(Process).to receive(:clock_gettime).and_return(0)
+        locker.instance_variable_get(:@queue_expires_at)[queue] = 60
+      end
+
+      it "advances the run_at cursor to the previous job's run_at after locking" do
+        expect_to_lock_with(cursor: 0, run_at_cursor: '-infinity')
+        expect_to_work(job_1)
+
+        expect_to_lock_with(cursor: job_1[:job_id], run_at_cursor: job_1[:run_at])
+        with_locked_job { |_job| }
+      end
+
+      it "resets both cursors when the expiry elapses" do
+        expect_to_lock_with(cursor: 0, run_at_cursor: '-infinity')
+        expect_to_work(job_1)
+
+        allow(Process).to receive(:clock_gettime).and_return(61)
+
+        expect_to_lock_with(cursor: 0, run_at_cursor: '-infinity')
+        with_locked_job { |_job| }
+      end
+    end
+
+    context "with run_at_cursor disabled (default)" do
+      let!(:job_1) { FakeJob.enqueue(1, queue: queue, priority: 1).attrs }
+      let(:cursor_expiry) { 60 }
+
+      before do
+        allow(Process).to receive(:clock_gettime).and_return(0)
+        locker.instance_variable_get(:@queue_expires_at)[queue] = 60
+      end
+
+      it "always passes -infinity as the run_at cursor regardless of jobs worked" do
+        expect_to_lock_with(cursor: 0, run_at_cursor: '-infinity')
+        expect_to_work(job_1)
+
+        expect_to_lock_with(cursor: job_1[:job_id], run_at_cursor: '-infinity')
+        with_locked_job { |_job| }
+      end
     end
   end
 end
