@@ -53,6 +53,7 @@ module Que
           FROM que_jobs AS j
           WHERE queue = $1::text
           AND job_id >= $2
+          AND run_at >= $3::timestamptz
           AND run_at <= now()
           AND retryable = true
           ORDER BY priority, run_at, job_id
@@ -65,6 +66,7 @@ module Que
               SELECT j
               FROM que_jobs AS j
               WHERE queue = $1::text
+              AND run_at >= $3::timestamptz
               AND run_at <= now()
               AND retryable = true
               AND (priority, run_at, job_id) > (jobs.priority, jobs.run_at, jobs.job_id)
@@ -183,6 +185,7 @@ module Que
             AND run_at <= now()
             AND retryable = true
             AND job_id >= $2
+            AND run_at >= $3::timestamptz
             ORDER BY priority, run_at, job_id
             FOR UPDATE SKIP LOCKED
             LIMIT 1
