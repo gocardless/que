@@ -30,7 +30,7 @@ RSpec.describe Que::Adapters::ActiveRecordWithLock, :active_record_with_lock do
   end
 
   describe ".lock_job_with_lock_database" do
-    subject(:lock_job) { adapter.lock_job_with_lock_database("default", 0) }
+    subject(:lock_job) { adapter.lock_job_with_lock_database("default", 0, '-infinity') }
 
     context "with no jobs enqueued" do
       it "exists the loop and sets correct metric values" do
@@ -38,6 +38,15 @@ RSpec.describe Que::Adapters::ActiveRecordWithLock, :active_record_with_lock do
         locked_job = lock_job
         expect(locked_job).to eq([])
         expect(described_class::FindJobHitTotal.values[{ :queue => "default", :job_hit => "true" }]).to eq(0.0)
+      end
+    end
+
+    context "when passing run_at_cursor" do
+      it "passes run_at_cursor through to find_job_to_lock" do
+        run_at_cursor = '2024-01-01 00:00:00'
+        allow(Que).to receive(:execute).and_call_original
+        expect(Que).to receive(:execute).with(:find_job_to_lock, ["default", 0, run_at_cursor]).and_return([])
+        adapter.lock_job_with_lock_database("default", 0, run_at_cursor)
       end
     end
   end
