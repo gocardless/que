@@ -121,7 +121,8 @@ module Que
       lock_cursor_expiry: DEFAULT_WAKE_INTERVAL,
       lock_window: nil,
       lock_budget: nil,
-      secondary_queues: []
+      secondary_queues: [],
+      run_at_cursor: false
     )
       @queue = queue
       @wake_interval = wake_interval
@@ -136,6 +137,7 @@ module Que
         window: lock_window,
         budget: lock_budget,
         secondary_queues: secondary_queues,
+        run_at_cursor: run_at_cursor,
       )
     end
 
