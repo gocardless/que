@@ -183,7 +183,7 @@ module Que
             AND run_at <= now()
             AND retryable = true
             AND job_id >= $2
-            ORDER BY priority, run_at, job_id
+            ORDER BY priority, job_id, run_at
             FOR UPDATE SKIP LOCKED
             LIMIT 1
     },
