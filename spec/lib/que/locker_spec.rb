@@ -43,13 +43,13 @@ RSpec.describe Que::Locker do
     end
 
     # Our tests are very concerned with which cursor we use and when
-    def expect_to_lock_with(cursor:, run_at_cursor: '-infinity')
+    def expect_to_lock_with(cursor:, run_at_cursor: "-infinity")
       expect(Que).to receive(:execute).with(:lock_job, [queue, cursor, run_at_cursor])
     end
 
     context "with no jobs to lock" do
       it "scans entire table and calls block with nil job" do
-        expect(Que).to receive(:execute).with(:lock_job, [queue, 0, '-infinity'])
+        expect(Que).to receive(:execute).with(:lock_job, [queue, 0, "-infinity"])
 
         with_locked_job do |job|
           expect(job).to be_nil
@@ -142,7 +142,7 @@ RSpec.describe Que::Locker do
       end
 
       it "advances the run_at cursor to the previous job's run_at after locking" do
-        expect_to_lock_with(cursor: 0, run_at_cursor: '-infinity')
+        expect_to_lock_with(cursor: 0, run_at_cursor: "-infinity")
         expect_to_work(job_1)
 
         expect_to_lock_with(cursor: job_1[:job_id], run_at_cursor: job_1[:run_at])
@@ -150,12 +150,12 @@ RSpec.describe Que::Locker do
       end
 
       it "resets both cursors when the expiry elapses" do
-        expect_to_lock_with(cursor: 0, run_at_cursor: '-infinity')
+        expect_to_lock_with(cursor: 0, run_at_cursor: "-infinity")
         expect_to_work(job_1)
 
         allow(Process).to receive(:clock_gettime).and_return(61)
 
-        expect_to_lock_with(cursor: 0, run_at_cursor: '-infinity')
+        expect_to_lock_with(cursor: 0, run_at_cursor: "-infinity")
         with_locked_job { |_job| }
       end
     end
@@ -170,10 +170,10 @@ RSpec.describe Que::Locker do
       end
 
       it "always passes -infinity as the run_at cursor regardless of jobs worked" do
-        expect_to_lock_with(cursor: 0, run_at_cursor: '-infinity')
+        expect_to_lock_with(cursor: 0, run_at_cursor: "-infinity")
         expect_to_work(job_1)
 
-        expect_to_lock_with(cursor: job_1[:job_id], run_at_cursor: '-infinity')
+        expect_to_lock_with(cursor: job_1[:job_id], run_at_cursor: "-infinity")
         with_locked_job { |_job| }
       end
     end
