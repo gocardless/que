@@ -15,7 +15,7 @@ module Que
   # For more information, see the 'Predicate Specificity' chapter of:
   # https://brandur.org/postgres-queues
   class Locker
-    RUN_AT_CURSOR_RESET = RUN_AT_CURSOR_RESET
+    RUN_AT_CURSOR_RESET = "-infinity"
 
     METRICS = [
       ExistsTotal = Prometheus::Client::Counter.new(
