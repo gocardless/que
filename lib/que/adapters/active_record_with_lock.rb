@@ -48,7 +48,7 @@ module Que
 
       # This method continues looping through the que_jobs table until it either
       # locks a job successfully or determines that there are no jobs to process.
-      def lock_job_with_lock_database(queue, cursor, run_at_cursor = '-infinity')
+      def lock_job_with_lock_database(queue, cursor, run_at_cursor = Que::Locker::RUN_AT_CURSOR_RESET)
         loop do
           observe(duration_metric: FindJobSecondsTotal, labels: { queue: queue }) do
             Que.transaction do

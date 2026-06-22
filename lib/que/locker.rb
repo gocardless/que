@@ -15,6 +15,8 @@ module Que
   # For more information, see the 'Predicate Specificity' chapter of:
   # https://brandur.org/postgres-queues
   class Locker
+    RUN_AT_CURSOR_RESET = RUN_AT_CURSOR_RESET
+
     METRICS = [
       ExistsTotal = Prometheus::Client::Counter.new(
         :que_locker_exists_total,
@@ -80,7 +82,7 @@ module Que
 
       job = @consolidated_queues.lazy.filter_map do |queue|
         cursor = @queue_cursors.fetch(queue, 0)
-        run_at_cursor = @queue_run_at_cursors.fetch(queue, '-infinity')
+        run_at_cursor = @queue_run_at_cursors.fetch(queue, RUN_AT_CURSOR_RESET)
         found_job = lock_job_in(queue, cursor, run_at_cursor)
 
         # Because we were using a cursor when we tried to lock this job, if we fail to
@@ -97,7 +99,7 @@ module Que
         # do the appropriate book keeping.
         if found_job.nil? && cursor != 0
           reset_cursor_for!(queue)
-          found_job = lock_job_in(queue, 0, '-infinity')
+          found_job = lock_job_in(queue, 0, RUN_AT_CURSOR_RESET)
         end
 
         found_job
@@ -165,7 +167,7 @@ module Que
 
     def reset_cursor_for!(queue)
       @queue_cursors[queue] = 0
-      @queue_run_at_cursors[queue] = '-infinity'
+      @queue_run_at_cursors[queue] = RUN_AT_CURSOR_RESET
       @queue_expires_at[queue] = monotonic_now + @cursor_expiry
     end
 
