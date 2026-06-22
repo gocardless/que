@@ -135,7 +135,6 @@ RSpec.describe Que::Locker do
       end
 
       let!(:job_1) { FakeJob.enqueue(1, queue: queue, priority: 1).attrs }
-      let!(:job_2) { FakeJob.enqueue(2, queue: queue, priority: 2).attrs }
 
       before do
         allow(Process).to receive(:clock_gettime).and_return(0)

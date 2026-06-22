@@ -47,7 +47,7 @@ OptionParser.new do |opts|
     options.lock_budget = lock_budget
   end
 
-  opts.on("--run-at-cursor", "Enable run_at cursor to skip jobs scheduled before the previous job's run_at (default: false)") do
+  opts.on("--run-at-cursor", "Enable run_at cursor to skip jobs due before the previous job's run_at (default: false)") do
     options.run_at_cursor = true
   end
 
