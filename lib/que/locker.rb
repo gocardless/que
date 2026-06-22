@@ -80,7 +80,8 @@ module Que
 
       job = @consolidated_queues.lazy.filter_map do |queue|
         cursor = @queue_cursors.fetch(queue, 0)
-        found_job = lock_job_in(queue, cursor)
+        run_at_cursor = @queue_run_at_cursors.fetch(queue, '-infinity')
+        found_job = lock_job_in(queue, cursor, run_at_cursor)
 
         # Because we were using a cursor when we tried to lock this job, if we fail to
         # find a job it is not necessarily the case that there aren't jobs in the
@@ -96,7 +97,7 @@ module Que
         # do the appropriate book keeping.
         if found_job.nil? && cursor != 0
           reset_cursor_for!(queue)
-          found_job = lock_job_in(queue, 0)
+          found_job = lock_job_in(queue, 0, '-infinity')
         end
 
         found_job
@@ -131,17 +132,17 @@ module Que
 
     private
 
-    def lock_job_in(queue, cursor)
+    def lock_job_in(queue, cursor, run_at_cursor)
       observe(nil, ThrottleSecondsTotal, worked_queue: queue) { @leaky_bucket.refill }
-      @leaky_bucket.observe { execute_lock_job_in(queue, cursor) }
+      @leaky_bucket.observe { execute_lock_job_in(queue, cursor, run_at_cursor) }
     end
 
-    def execute_lock_job_in(queue, cursor)
+    def execute_lock_job_in(queue, cursor, run_at_cursor)
       strategy = cursor.zero? ? "full" : "cursor"
       observe(AcquireTotal, AcquireSecondsTotal,
               worked_queue: queue,
               strategy: strategy) do
-        lock_job_query(queue, cursor)
+        lock_job_query(queue, cursor, run_at_cursor)
       end
     end
 
@@ -151,9 +152,8 @@ module Que
       end
     end
 
-    def lock_job_query(queue, cursor)
-      run_at = @queue_run_at_cursors.fetch(queue, '-infinity')
-      Que.execute(:lock_job, [queue, cursor, run_at]).first
+    def lock_job_query(queue, cursor, run_at_cursor)
+      Que.execute(:lock_job, [queue, cursor, run_at_cursor]).first
     end
 
     def handle_expired_cursors!
