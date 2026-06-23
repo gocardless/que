@@ -43,8 +43,8 @@ RSpec.describe Que::Locker do
     end
 
     # Our tests are very concerned with which cursor we use and when
-    def expect_to_lock_with(cursor:, run_at_cursor: "-infinity")
-      expect(Que).to receive(:execute).with(:lock_job, [queue, cursor, run_at_cursor])
+    def expect_to_lock_with(cursor:, run_at_lower_bound: "-infinity")
+      expect(Que).to receive(:execute).with(:lock_job, [queue, cursor, run_at_lower_bound])
     end
 
     context "with no jobs to lock" do
@@ -142,20 +142,20 @@ RSpec.describe Que::Locker do
       end
 
       it "advances the run_at cursor to the previous job's run_at after locking" do
-        expect_to_lock_with(cursor: 0, run_at_cursor: "-infinity")
+        expect_to_lock_with(cursor: 0, run_at_lower_bound: "-infinity")
         expect_to_work(job_1)
 
-        expect_to_lock_with(cursor: job_1[:job_id], run_at_cursor: job_1[:run_at])
+        expect_to_lock_with(cursor: job_1[:job_id], run_at_lower_bound: job_1[:run_at])
         with_locked_job { |_job| }
       end
 
       it "resets both cursors when the expiry elapses" do
-        expect_to_lock_with(cursor: 0, run_at_cursor: "-infinity")
+        expect_to_lock_with(cursor: 0, run_at_lower_bound: "-infinity")
         expect_to_work(job_1)
 
         allow(Process).to receive(:clock_gettime).and_return(61)
 
-        expect_to_lock_with(cursor: 0, run_at_cursor: "-infinity")
+        expect_to_lock_with(cursor: 0, run_at_lower_bound: "-infinity")
         with_locked_job { |_job| }
       end
     end
@@ -170,10 +170,10 @@ RSpec.describe Que::Locker do
       end
 
       it "always passes -infinity as the run_at cursor regardless of jobs worked" do
-        expect_to_lock_with(cursor: 0, run_at_cursor: "-infinity")
+        expect_to_lock_with(cursor: 0, run_at_lower_bound: "-infinity")
         expect_to_work(job_1)
 
-        expect_to_lock_with(cursor: job_1[:job_id], run_at_cursor: "-infinity")
+        expect_to_lock_with(cursor: job_1[:job_id], run_at_lower_bound: "-infinity")
         with_locked_job { |_job| }
       end
     end
