@@ -30,7 +30,7 @@ RSpec.describe Que::Adapters::ActiveRecordWithLock, :active_record_with_lock do
   end
 
   describe ".lock_job_with_lock_database" do
-    subject(:lock_job) { adapter.lock_job_with_lock_database("default", 0, "-infinity") }
+    subject(:lock_job) { adapter.lock_job_with_lock_database("default", 0) }
 
     context "with no jobs enqueued" do
       it "exists the loop and sets correct metric values" do
