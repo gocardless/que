@@ -47,6 +47,10 @@ OptionParser.new do |opts|
     options.lock_budget = lock_budget
   end
 
+  opts.on("--run-at-cursor", "Enable run_at cursor to skip jobs due before the previous job's run_at (default: false)") do
+    options.run_at_cursor = true
+  end
+
   opts.on("-c", "--worker-count [COUNT]", Integer, "Start this many threaded workers") do |worker_count|
     options.worker_count = worker_count
   end
@@ -100,6 +104,7 @@ log_level        = options.log_level     || ENV["QUE_LOG_LEVEL"]           || "i
 queue_name       = options.queue_name    || ENV["QUE_QUEUE"]               || Que::Worker::DEFAULT_QUEUE
 wake_interval    = options.wake_interval || ENV["QUE_WAKE_INTERVAL"]&.to_f || Que::Worker::DEFAULT_WAKE_INTERVAL
 cursor_expiry    = options.cursor_expiry || wake_interval
+run_at_cursor    = options.run_at_cursor || false
 worker_count     = options.worker_count  || 1
 timeout          = options.timeout
 secondary_queues = options.secondary_queues || []
@@ -128,6 +133,7 @@ worker_group = Que::WorkerGroup.start(
   lock_window: options.lock_window,
   lock_budget: options.lock_budget,
   secondary_queues: secondary_queues,
+  run_at_cursor: run_at_cursor,
 )
 
 if options.metrics_port

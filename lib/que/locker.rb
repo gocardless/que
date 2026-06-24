@@ -15,6 +15,8 @@ module Que
   # For more information, see the 'Predicate Specificity' chapter of:
   # https://brandur.org/postgres-queues
   class Locker
+    RUN_AT_CURSOR_RESET = nil
+
     METRICS = [
       ExistsTotal = Prometheus::Client::Counter.new(
         :que_locker_exists_total,
@@ -53,10 +55,12 @@ module Que
       ),
     ].freeze
 
-    def initialize(queue:, cursor_expiry:, window: nil, budget: nil, secondary_queues: [])
+    def initialize(queue:, cursor_expiry:, window: nil, budget: nil, secondary_queues: [], run_at_cursor: false)
       @queue = queue
       @cursor_expiry = cursor_expiry
+      @run_at_cursor = run_at_cursor
       @queue_cursors = {}
+      @run_at_lower_bounds = {}
       @queue_expires_at = {}
       @secondary_queues = secondary_queues
       @consolidated_queues = Array.wrap(queue).concat(secondary_queues)
@@ -78,7 +82,8 @@ module Que
 
       job = @consolidated_queues.lazy.filter_map do |queue|
         cursor = @queue_cursors.fetch(queue, 0)
-        found_job = lock_job_in(queue, cursor)
+        run_at_lower_bound = @run_at_lower_bounds.fetch(queue, RUN_AT_CURSOR_RESET)
+        found_job = lock_job_in(queue, cursor, run_at_lower_bound)
 
         # Because we were using a cursor when we tried to lock this job, if we fail to
         # find a job it is not necessarily the case that there aren't jobs in the
@@ -94,7 +99,7 @@ module Que
         # do the appropriate book keeping.
         if found_job.nil? && cursor != 0
           reset_cursor_for!(queue)
-          found_job = lock_job_in(queue, 0)
+          found_job = lock_job_in(queue, 0, RUN_AT_CURSOR_RESET)
         end
 
         found_job
@@ -116,6 +121,7 @@ module Que
       return if job && !exists?(job)
 
       @queue_cursors[job[:queue]] = job[:job_id] if job
+      @run_at_lower_bounds[job[:queue]] = job[:run_at] if job && @run_at_cursor
 
       yield job
     ensure
@@ -128,17 +134,17 @@ module Que
 
     private
 
-    def lock_job_in(queue, cursor)
+    def lock_job_in(queue, cursor, run_at_lower_bound)
       observe(nil, ThrottleSecondsTotal, worked_queue: queue) { @leaky_bucket.refill }
-      @leaky_bucket.observe { execute_lock_job_in(queue, cursor) }
+      @leaky_bucket.observe { execute_lock_job_in(queue, cursor, run_at_lower_bound) }
     end
 
-    def execute_lock_job_in(queue, cursor)
+    def execute_lock_job_in(queue, cursor, run_at_lower_bound)
       strategy = cursor.zero? ? "full" : "cursor"
       observe(AcquireTotal, AcquireSecondsTotal,
               worked_queue: queue,
               strategy: strategy) do
-        lock_job_query(queue, cursor)
+        lock_job_query(queue, cursor, run_at_lower_bound)
       end
     end
 
@@ -148,8 +154,8 @@ module Que
       end
     end
 
-    def lock_job_query(queue, cursor)
-      Que.execute(:lock_job, [queue, cursor]).first
+    def lock_job_query(queue, cursor, run_at_lower_bound)
+      Que.execute(:lock_job, [queue, cursor, run_at_lower_bound]).first
     end
 
     def handle_expired_cursors!
@@ -161,6 +167,7 @@ module Que
 
     def reset_cursor_for!(queue)
       @queue_cursors[queue] = 0
+      @run_at_lower_bounds[queue] = RUN_AT_CURSOR_RESET
       @queue_expires_at[queue] = monotonic_now + @cursor_expiry
     end
 

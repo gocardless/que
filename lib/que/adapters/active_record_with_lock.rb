@@ -36,8 +36,8 @@ module Que
       def execute(command, params = [])
         case command
         when :lock_job
-          queue, cursor = params
-          lock_job_with_lock_database(queue, cursor)
+          queue, cursor, run_at_lower_bound = params
+          lock_job_with_lock_database(queue, cursor, run_at_lower_bound)
         when :unlock_job
           job_id = params[0]
           unlock_job(job_id)
@@ -48,11 +48,11 @@ module Que
 
       # This method continues looping through the que_jobs table until it either
       # locks a job successfully or determines that there are no jobs to process.
-      def lock_job_with_lock_database(queue, cursor)
+      def lock_job_with_lock_database(queue, cursor, run_at_lower_bound = Que::Locker::RUN_AT_CURSOR_RESET)
         loop do
           observe(duration_metric: FindJobSecondsTotal, labels: { queue: queue }) do
             Que.transaction do
-              job_to_lock = Que.execute(:find_job_to_lock, [queue, cursor])
+              job_to_lock = Que.execute(:find_job_to_lock, [queue, cursor, run_at_lower_bound])
               return job_to_lock if job_to_lock.empty?
 
               cursor = job_to_lock.first["job_id"]

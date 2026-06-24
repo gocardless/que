@@ -40,5 +40,14 @@ RSpec.describe Que::Adapters::ActiveRecordWithLock, :active_record_with_lock do
         expect(described_class::FindJobHitTotal.values[{ :queue => "default", :job_hit => "true" }]).to eq(0.0)
       end
     end
+
+    context "when passing run_at_cursor" do
+      it "passes run_at_cursor through to find_job_to_lock" do
+        run_at_cursor = "2024-01-01 00:00:00"
+        allow(Que).to receive(:execute).and_call_original
+        expect(Que).to receive(:execute).with(:find_job_to_lock, ["default", 0, run_at_cursor]).and_return([])
+        adapter.lock_job_with_lock_database("default", 0, run_at_cursor)
+      end
+    end
   end
 end

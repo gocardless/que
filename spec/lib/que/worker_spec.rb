@@ -211,7 +211,7 @@ RSpec.describe Que::Worker do
           FakeJob.enqueue(1)
 
           expect(Que).
-            to receive(:execute).with(:lock_job, ["default", 0]).and_raise(PG::Error)
+            to receive(:execute).with(:lock_job, ["default", 0, nil]).and_raise(PG::Error)
           expect(work).to eq(:postgres_error)
         end
       end
@@ -219,7 +219,7 @@ RSpec.describe Que::Worker do
       context "when postgres raises a bad connection error while processing a job" do
         before do
           allow(Que).to receive(:execute).
-            with(:lock_job, ["default", 0]).
+            with(:lock_job, ["default", 0, nil]).
             and_raise(PG::ConnectionBad)
 
           # Ensure we don't have any currently leased connections, since in a thread
@@ -246,7 +246,7 @@ RSpec.describe Que::Worker do
           FakeJob.enqueue(1)
 
           expect(Que).
-            to receive(:execute).with(:lock_job, ["default", 0]).
+            to receive(:execute).with(:lock_job, ["default", 0, nil]).
             and_raise(ActiveRecord::ConnectionTimeoutError)
           expect(work).to eq(:postgres_error)
         end
@@ -257,7 +257,7 @@ RSpec.describe Que::Worker do
           FakeJob.enqueue(1)
 
           expect(Que).
-            to receive(:execute).with(:lock_job, ["default", 0]).
+            to receive(:execute).with(:lock_job, ["default", 0, nil]).
             and_raise(ActiveRecord::ConnectionNotEstablished)
           expect(work).to eq(:postgres_error)
         end
@@ -286,18 +286,18 @@ RSpec.describe Que::Worker do
     it "is false after a postgres error" do
       FakeJob.enqueue(1)
       expect(Que).
-        to receive(:execute).with(:lock_job, ["default", 0]).and_raise(PG::Error)
+        to receive(:execute).with(:lock_job, ["default", 0, nil]).and_raise(PG::Error)
       worker.work
       expect(worker).to_not be_healthy
     end
 
     it "recovers once work succeeds after a postgres error" do
       expect(Que).
-        to receive(:execute).with(:lock_job, ["default", 0]).and_raise(PG::Error)
+        to receive(:execute).with(:lock_job, ["default", 0, nil]).and_raise(PG::Error)
       worker.work
       expect(worker).to_not be_healthy
 
-      allow(Que).to receive(:execute).with(:lock_job, ["default", 0]).and_return([])
+      allow(Que).to receive(:execute).with(:lock_job, ["default", 0, nil]).and_return([])
       worker.work # no job found, returns :job_not_found
       expect(worker).to be_healthy
     end
