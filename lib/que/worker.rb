@@ -122,10 +122,12 @@ module Que
       lock_window: nil,
       lock_budget: nil,
       secondary_queues: [],
-      run_at_cursor: false
+      run_at_cursor: false,
+      wakeup: nil
     )
       @queue = queue
       @wake_interval = wake_interval
+      @wakeup = wakeup
       @tracer = LongRunningMetricTracer.new(self)
       @stop = false # instruct worker to stop
       @stopped = false # mark worker as having stopped
@@ -157,7 +159,7 @@ module Que
           when :job_not_found
             Que.logger&.debug(event: "que.job_not_found", wake_interval: @wake_interval)
             @tracer.trace(SleepingSecondsTotal, queue: @queue, primary_queue: @queue) do
-              sleep(@wake_interval)
+              wait_for_wakeup_or_timeout
             end
           when :job_worked
             nil # immediately find a new job to work
@@ -289,6 +291,17 @@ module Que
     end
 
     private
+
+    # Wait up to wake_interval seconds before polling again. If we've been given a
+    # wakeup mutex/condvar (i.e. pg_notify listening is enabled), wake up as soon as
+    # a job becomes available rather than always waiting out the full interval - the
+    # bounded wait still falls back to plain polling if no notification arrives.
+    def wait_for_wakeup_or_timeout
+      return sleep(@wake_interval) unless @wakeup
+
+      mutex = @wakeup.fetch(:mutex)
+      mutex.synchronize { @wakeup.fetch(:condvar).wait(mutex, @wake_interval) }
+    end
 
     # Set the error and retry with back-off
     def handle_job_failure(error, job)

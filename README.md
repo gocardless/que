@@ -112,6 +112,12 @@ To determine what happens when a job is queued, you can set Que's mode. There ar
 
 **If you're using ActiveRecord to dump your database's schema, [set your schema_format to :sql](http://guides.rubyonrails.org/migrations.html#types-of-schema-dumps) so that Que's table structure is managed correctly.** (You can use schema_format as :ruby if you want but keep in mind this is highly advised against, as some parts of Que will not work.)
 
+### Reducing polling latency with pg_notify
+
+By default, idle workers only notice new jobs on their next poll (`--wake-interval`/`wake_interval`, 5 seconds by default). Running `Que.migrate!` up to the latest schema version adds a trigger that calls `pg_notify` whenever a job becomes available, and passing `--listen` to `bin/que` (or `listen: true` to `Que::WorkerGroup.start`) makes idle workers wake up on that notification instead of waiting out the full interval. Polling itself is unaffected and still runs as normal - notifications are purely a way to shorten the wait, so a missed one just means the job is picked up on the next poll as before.
+
+This holds one dedicated connection open for the lifetime of each worker group to listen on, in addition to the connections workers use to run queries. If you're using a pooled adapter (ActiveRecord, Sequel, Pond), make sure your pool has capacity for one extra connection per worker group when enabling `--listen`.
+
 
 ## Related Projects
 

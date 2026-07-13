@@ -17,15 +17,19 @@ module Que
       ),
     ].freeze
 
-    def self.start(count, **kwargs)
+    def self.start(count, listen: false, **kwargs)
       Que.logger.info(
         msg: "Starting workers",
         event: "que.worker.start",
         worker_count: count,
       )
 
-      workers = Array.new(count) { Worker.new(**kwargs) }
+      wakeup = { mutex: Mutex.new, condvar: ConditionVariable.new } if listen
+
+      workers = Array.new(count) { Worker.new(wakeup: wakeup, **kwargs) }
       worker_threads = workers.map { |worker| Thread.new { worker.work_loop } }
+
+      listener = start_listener(kwargs, wakeup) if listen
 
       # We want to ensure that our control flow for Que threads and our metric endpoints
       # are prioritised above CPU intensive work of jobs. If people use the metrics
@@ -40,12 +44,22 @@ module Que
         thread.name = "worker-thread-#{index}"
       end
 
-      new(workers, worker_threads)
+      new(workers, worker_threads, listener, wakeup)
     end
 
-    def initialize(workers, worker_threads)
+    def self.start_listener(kwargs, wakeup)
+      queue = kwargs[:queue] || Worker::DEFAULT_QUEUE
+      queues = Array(queue).concat(Array(kwargs[:secondary_queues])).uniq
+
+      Listener.new(queues: queues, wakeup: wakeup).start
+    end
+    private_class_method :start_listener
+
+    def initialize(workers, worker_threads, listener = nil, wakeup = nil)
       @workers = workers
       @worker_threads = worker_threads
+      @listener = listener
+      @wakeup = wakeup
     end
 
     attr_reader :workers
@@ -68,6 +82,10 @@ module Que
       Que.logger.info(msg: "Asking workers to finish", event: "que.worker.finish_wait")
 
       @workers.each(&:stop!)
+
+      # If workers are parked waiting on a notification (rather than plain polling),
+      # wake them immediately so they notice @stop without waiting out wake_interval.
+      wake_all_workers!
 
       # Asynchronously stop all workers, sending a join method call with a timeout. This
       # is done asynchronously to ensure we start the timeout at the same time for each
@@ -102,7 +120,17 @@ module Que
       # exception against the job it was working.
       @worker_threads.each(&:join)
 
+      @listener&.stop
+
       Que.logger.info(msg: "All workers have finished", event: "que.worker.finish")
+    end
+
+    private
+
+    def wake_all_workers!
+      return unless @wakeup
+
+      @wakeup.fetch(:mutex).synchronize { @wakeup.fetch(:condvar).broadcast }
     end
   end
 end
