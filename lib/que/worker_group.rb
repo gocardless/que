@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require_relative "worker"
+require_relative "locker"
+require_relative "job_buffer"
 
 module Que
   class WorkerGroup
@@ -15,16 +17,50 @@ module Que
         :que_worker_group_expected_workers_count,
         docstring: "Number of configured workers",
       ),
+
+      LockerAliveGauge = Prometheus::Client::Gauge.new(
+        :que_worker_group_locker_alive,
+        docstring: "Whether this process's single Locker thread is alive (1) or dead (0). " \
+                   "The Locker is what polls Postgres for jobs, so if it's dead, no worker " \
+                   "in this process will ever find new work.",
+      ),
     ].freeze
 
-    def self.start(count, **kwargs)
+    def self.start(
+      count,
+      queue: Worker::DEFAULT_QUEUE,
+      wake_interval: Locker::DEFAULT_WAKE_INTERVAL,
+      lock_cursor_expiry: wake_interval,
+      lock_window: nil,
+      lock_budget: nil,
+      secondary_queues: [],
+      run_at_cursor: false
+    )
       Que.logger.info(
         msg: "Starting workers",
         event: "que.worker.start",
         worker_count: count,
       )
 
-      workers = Array.new(count) { Worker.new(**kwargs) }
+      job_buffer = JobBuffer.new(maximum_size: count)
+
+      locker =
+        Locker.new(
+          queue: queue,
+          cursor_expiry: lock_cursor_expiry,
+          window: lock_window,
+          budget: lock_budget,
+          secondary_queues: secondary_queues,
+          run_at_cursor: run_at_cursor,
+          wake_interval: wake_interval,
+          job_buffer: job_buffer,
+        ).start
+
+      workers =
+        Array.new(count) do
+          Worker.new(queue: queue, wake_interval: wake_interval, job_buffer: job_buffer)
+        end
+
       worker_threads = workers.map { |worker| Thread.new { worker.work_loop } }
 
       # We want to ensure that our control flow for Que threads and our metric endpoints
@@ -40,15 +76,17 @@ module Que
         thread.name = "worker-thread-#{index}"
       end
 
-      new(workers, worker_threads)
+      new(workers, worker_threads, locker, job_buffer)
     end
 
-    def initialize(workers, worker_threads)
+    def initialize(workers, worker_threads, locker, job_buffer)
       @workers = workers
       @worker_threads = worker_threads
+      @locker = locker
+      @job_buffer = job_buffer
     end
 
-    attr_reader :workers
+    attr_reader :workers, :locker
 
     def collect_metrics
       # Threads that are no longer running will have either a status of `nil` (terminated
@@ -62,10 +100,20 @@ module Que
 
       ActiveWorkersCount.set(active_threads.count)
       ExpectedWorkersCount.set(workers.count)
+      LockerAliveGauge.set(@locker.alive? ? 1 : 0)
     end
 
     def stop(timeout = DEFAULT_STOP_TIMEOUT)
       Que.logger.info(msg: "Asking workers to finish", event: "que.worker.finish_wait")
+
+      # Stop polling for new jobs, wake up (and stop) any workers blocked waiting on the
+      # buffer, and wait for the locker to drain+unlock anything it had already buffered
+      # but that no worker had claimed yet. We do all of this before tearing down worker
+      # threads below, so we never hand a freshly-locked job to a worker that's already
+      # being asked to stop.
+      @locker.stop!
+      @job_buffer.stop
+      @locker.wait_until_stopped
 
       @workers.each(&:stop!)
 

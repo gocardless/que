@@ -3,11 +3,24 @@
 require "spec_helper"
 
 RSpec.describe Que::Worker do
+  subject(:worker) { described_class.new(job_buffer: job_buffer) }
+
+  let(:job_buffer) { Que::JobBuffer.new(maximum_size: 10) }
+
+  # Worker no longer locks jobs itself (that's the Locker's job - see locker_spec.rb), so
+  # to exercise Worker#work with a realistic, already-locked job hash (including
+  # DB-computed fields like `latency`), lock whatever's next in the queue directly via the
+  # same SQL a Locker would use, then hand it to the worker under test.
+  def work_next_job(queue: "default")
+    locked_job = Que.execute(:lock_job, [queue, 0, nil]).first
+    worker.work(locked_job)
+  end
+
   describe ".work" do
-    subject(:work) { described_class.new.work }
+    subject(:work) { work_next_job }
 
     it "returns job_not_found if there's no job to work" do
-      expect(work).to eq(:job_not_found)
+      expect(worker.work(nil)).to eq(:job_not_found)
     end
 
     context "when there's a job to work" do
@@ -208,19 +221,19 @@ RSpec.describe Que::Worker do
 
       context "when postgres raises an exception while processing a job" do
         it "rescues it and returns an error" do
-          FakeJob.enqueue(1)
+          ExceptionalJob.enqueue(1)
 
-          expect(Que).
-            to receive(:execute).with(:lock_job, ["default", 0, nil]).and_raise(PG::Error)
+          allow(Que).to receive(:execute).and_call_original
+          expect(Que).to receive(:execute).with(:set_error, anything).and_raise(PG::Error)
+
           expect(work).to eq(:postgres_error)
         end
       end
 
       context "when postgres raises a bad connection error while processing a job" do
         before do
-          allow(Que).to receive(:execute).
-            with(:lock_job, ["default", 0, nil]).
-            and_raise(PG::ConnectionBad)
+          allow(Que).to receive(:execute).and_call_original
+          allow(Que).to receive(:execute).with(:set_error, anything).and_raise(PG::ConnectionBad)
 
           # Ensure we don't have any currently leased connections, since in a thread
           # using with_connection this would never be the case (but in specs it
@@ -231,34 +244,44 @@ RSpec.describe Que::Worker do
         let(:pool) { ActiveRecord::Base.connection_pool }
 
         it "rescues it and returns an error" do
-          FakeJob.enqueue(1)
+          ExceptionalJob.enqueue(1)
 
           expect(work).to eq(:postgres_error)
         end
 
         it "removes the connection from the connection pool" do
-          expect { work }.to_not change { pool.connections.count }.from(0)
+          # Unlike the sibling example above, we need a job to already be enqueued (and
+          # locked) before `work` is called at all, since Worker no longer locks its own
+          # jobs - so the pool's connection count won't be 0 at this point the way it was
+          # when Worker's own lock_job call was what first touched the database.
+          ExceptionalJob.enqueue(1)
+
+          expect { work }.to_not(change { pool.connections.count })
         end
       end
 
       context "when we time out checking out a new connection" do
         it "rescues it and returns an error" do
-          FakeJob.enqueue(1)
+          ExceptionalJob.enqueue(1)
 
+          allow(Que).to receive(:execute).and_call_original
           expect(Que).
-            to receive(:execute).with(:lock_job, ["default", 0, nil]).
+            to receive(:execute).with(:set_error, anything).
             and_raise(ActiveRecord::ConnectionTimeoutError)
+
           expect(work).to eq(:postgres_error)
         end
       end
 
       context "when we can't connect to postgres" do
         it "rescues it and returns an error" do
-          FakeJob.enqueue(1)
+          ExceptionalJob.enqueue(1)
 
+          allow(Que).to receive(:execute).and_call_original
           expect(Que).
-            to receive(:execute).with(:lock_job, ["default", 0, nil]).
+            to receive(:execute).with(:set_error, anything).
             and_raise(ActiveRecord::ConnectionNotEstablished)
+
           expect(work).to eq(:postgres_error)
         end
       end
@@ -266,39 +289,52 @@ RSpec.describe Que::Worker do
   end
 
   describe "#healthy?" do
-    subject(:worker) { described_class.new }
-
     it "is true before the worker has done any work" do
       expect(worker).to be_healthy
     end
 
     it "is true when no job is found" do
-      worker.work
+      work_next_job
       expect(worker).to be_healthy
     end
 
     it "is true after successfully working a job" do
       FakeJob.enqueue(1)
-      worker.work
+      work_next_job
       expect(worker).to be_healthy
     end
 
     it "is false after a postgres error" do
-      FakeJob.enqueue(1)
-      expect(Que).
-        to receive(:execute).with(:lock_job, ["default", 0, nil]).and_raise(PG::Error)
-      worker.work
+      ExceptionalJob.enqueue(1)
+
+      # A PG::Error raised while destroying a *successful* job would be caught by the
+      # job's own inner rescue (PG::Error is a StandardError) and routed to the ordinary
+      # failure/retry path rather than surfacing as :postgres_error. To trigger a genuine
+      # :postgres_error, the failure needs to happen in the error-handling path itself
+      # (set_error), which nothing catches.
+      allow(Que).to receive(:execute).and_call_original
+      expect(Que).to receive(:execute).with(:set_error, anything).and_raise(PG::Error)
+
+      work_next_job
       expect(worker).to_not be_healthy
     end
 
     it "recovers once work succeeds after a postgres error" do
-      expect(Que).
-        to receive(:execute).with(:lock_job, ["default", 0, nil]).and_raise(PG::Error)
-      worker.work
+      job = ExceptionalJob.enqueue(1)
+
+      allow(Que).to receive(:execute).and_call_original
+      expect(Que).to receive(:execute).with(:set_error, anything).and_raise(PG::Error)
+
+      work_next_job
       expect(worker).to_not be_healthy
 
-      allow(Que).to receive(:execute).with(:lock_job, ["default", 0, nil]).and_return([])
-      worker.work # no job found, returns :job_not_found
+      # The set_error update never completed (it raised), so the job row is still sat in
+      # the queue, still due, and unlocked (Worker#work always unlocks in its ensure
+      # block). Remove it directly so the next poll finds nothing, simulating the
+      # underlying issue having cleared.
+      QueJob.find(job.attrs["job_id"]).destroy!
+
+      work_next_job
       expect(worker).to be_healthy
     end
   end

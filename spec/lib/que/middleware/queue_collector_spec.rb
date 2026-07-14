@@ -26,7 +26,8 @@ RSpec.describe Que::Middleware::QueueCollector do
     job_to_fail = FakeJob.enqueue(run_at: due_now, priority: 20, retryable: false)
     error = StandardError.new("bang")
     error.set_backtrace(caller)
-    Que::Worker.new.send(:handle_job_failure, error, job_to_fail.attrs)
+    Que::Worker.new(job_buffer: Que::JobBuffer.new(maximum_size: 1)).
+      send(:handle_job_failure, error, job_to_fail.attrs)
 
     # not due, different queue
     FakeJob.enqueue(run_at: pending_now, queue: "another", priority: 1)

@@ -38,6 +38,9 @@ module Que
         when :lock_job
           queue, cursor, run_at_lower_bound = params
           lock_job_with_lock_database(queue, cursor, run_at_lower_bound)
+        when :lock_jobs_batch
+          queue, cursor, run_at_lower_bound, limit, held_ids = params
+          lock_jobs_with_lock_database(queue, cursor, run_at_lower_bound, limit, held_ids)
         when :unlock_job
           job_id = params[0]
           unlock_job(job_id)
@@ -63,6 +66,61 @@ module Que
             end
           end
         end
+      end
+
+      # Batched counterpart to lock_job_with_lock_database: keeps looping through
+      # candidates (skipping any we fail to advisory-lock, same as the single-job
+      # version) until we've locked `limit` jobs or there are no more candidates left.
+      #
+      # We deliberately do NOT delegate to the generic recursive-CTE `lock_jobs_batch` SQL
+      # here (unlike the default adapter) - that query takes its advisory locks on
+      # whatever connection runs it, which for this adapter must be the dedicated
+      # lock_connection_pool, not the job_connection_pool used for find_job_to_lock. Row
+      # skipping is instead handled by `FOR UPDATE SKIP LOCKED` in find_job_to_lock, one
+      # candidate row at a time, exactly as the single-job version does.
+      #
+      # held_ids (a "{1,2,3}" Postgres array literal, same format the Locker builds for
+      # the generic SQL path) lists job_ids the Locker already holds. We must skip these
+      # without even attempting pg_try_advisory_lock: since that lock is reentrant within
+      # a session, re-locking a job we already hold would trivially "succeed" again and
+      # get double-dispatched to another worker.
+      def lock_jobs_with_lock_database(queue, cursor, run_at_lower_bound, limit, held_ids)
+        held_id_set = parse_id_array_literal(held_ids)
+        locked_jobs = []
+
+        while locked_jobs.size < limit
+          job_locked = false
+
+          candidate =
+            observe(duration_metric: FindJobSecondsTotal, labels: { queue: queue }) do
+              Que.transaction do
+                job_to_lock = Que.execute(:find_job_to_lock, [queue, cursor, run_at_lower_bound])
+                break job_to_lock if job_to_lock.empty?
+
+                cursor = job_to_lock.first["job_id"]
+
+                unless held_id_set.include?(cursor)
+                  job_locked = pg_try_advisory_lock?(cursor)
+                  observe(count_metric: FindJobHitTotal, labels: { queue: queue, job_hit: job_locked })
+                end
+
+                job_to_lock
+              end
+            end
+
+          # No more candidates left in the table for this queue - stop looking.
+          break if candidate.empty?
+
+          # Whether or not we won the lock, the cursor has advanced past this candidate,
+          # so the next iteration looks further down the queue.
+          locked_jobs.concat(candidate) if job_locked
+        end
+
+        locked_jobs
+      end
+
+      def parse_id_array_literal(literal)
+        literal.to_s.delete_prefix("{").delete_suffix("}").split(",").reject(&:empty?).to_set(&:to_i)
       end
 
       def pg_try_advisory_lock?(job_id)
