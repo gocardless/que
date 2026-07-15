@@ -1,0 +1,154 @@
+# frozen_string_literal: true
+
+require_relative "leaky_bucket"
+require_relative "locker"
+
+module Que
+  # The pre-centralization Locker: each instance is owned by a single Worker
+  # (LegacyWorker) and independently locks exactly one job at a time via its own
+  # recursive-CTE query, on its own thread.
+  #
+  # This is kept only to support `--architecture=legacy` (see WorkerGroup), as a rollback
+  # path while the centralized Locker+JobBuffer architecture (see Locker) bakes in
+  # production. Once centralized locking is the sole path, this class (along with
+  # LegacyWorker and the architecture switch) should be removed.
+  #
+  # Deliberately reuses Locker's Prometheus metric constants rather than declaring its
+  # own copies with the same names - only one architecture is ever active in a given
+  # process, and operators shouldn't need separate dashboards depending on which is
+  # selected.
+  class LegacyLocker
+    RUN_AT_CURSOR_RESET = Locker::RUN_AT_CURSOR_RESET
+
+    def initialize(queue:, cursor_expiry:, window: nil, budget: nil, secondary_queues: [], run_at_cursor: false)
+      @queue = queue
+      @cursor_expiry = cursor_expiry
+      @run_at_cursor = run_at_cursor
+      @queue_cursors = {}
+      @run_at_lower_bounds = {}
+      @queue_expires_at = {}
+      @secondary_queues = secondary_queues
+      @consolidated_queues = Array.wrap(queue).concat(secondary_queues)
+
+      # Create a bucket that has 100% capacity, so even when we don't apply a limit we
+      # have a valid bucket that we can use everywhere
+      @leaky_bucket = LeakyBucket.new(window: window || 1.0, budget: budget || 1.0)
+
+      # Initialise the cursor maps
+      handle_expired_cursors!
+    end
+
+    # Acquire a job for the period of running the given block. Returning nil without
+    # calling the given block will cause the worker to immediately retry locking a job-
+    # yielding with nil means there were no jobs to lock, and the worker will pause before
+    # retrying.
+    def with_locked_job
+      handle_expired_cursors!
+
+      job = @consolidated_queues.lazy.filter_map do |queue|
+        cursor = @queue_cursors.fetch(queue, 0)
+        run_at_lower_bound = @run_at_lower_bounds.fetch(queue, RUN_AT_CURSOR_RESET)
+        found_job = lock_job_in(queue, cursor, run_at_lower_bound)
+
+        # Because we were using a cursor when we tried to lock this job, if we fail to
+        # find a job it is not necessarily the case that there aren't jobs in the
+        # queue. We may have been excluding candidate jobs due to the cursor that
+        # are now due to be worked.
+        #
+        # We should attempt to lock again after resetting our cursor to make sure we
+        # include jobs that were excluded in the first attempt.
+        #
+        # We leave the cursors for subsequant queues alone however. The idea there is
+        # that if we've touched a subsequant queue at some point and gotten on a cursor
+        # then work appears on a more pressing queue then `handle_expired_cursors` will
+        # do the appropriate book keeping.
+        if found_job.nil? && cursor != 0
+          reset_cursor_for!(queue)
+          found_job = lock_job_in(queue, 0, RUN_AT_CURSOR_RESET)
+        end
+
+        found_job
+      end.first
+
+      # Check that the job hasn't just been worked by another worker (it's possible to
+      # lock a job that's just been destroyed because pg locks don't obey MVCC). If it has
+      # been worked, return nil to immediately retry locking.
+      #
+      # This can happen with jobs that are already being worked when we begin our lock
+      # query. The job row exists but is locked at the point that we materialise our job
+      # rows for use in the recursive query. At some point after that, but before we
+      # attempt to take our lock, the original worker destroys the job row and unlocks the
+      # advisory lock. We then attempt to lock the ID, and succeed, despite the job having
+      # already been worked.
+      #
+      # To avoid working the job a second time, we check whether it exists again after
+      # acquiring the lock on it.
+      return if job && !exists?(job)
+
+      @queue_cursors[job[:queue]] = job[:job_id] if job
+      @run_at_lower_bounds[job[:queue]] = job[:run_at] if job && @run_at_cursor
+
+      yield job
+    ensure
+      if job
+        observe(Locker::UnlockTotal, Locker::UnlockSecondsTotal, worked_queue: job[:queue]) do
+          Que.execute(:unlock_job, [job[:job_id]])
+        end
+      end
+    end
+
+    private
+
+    def lock_job_in(queue, cursor, run_at_lower_bound)
+      observe(nil, Locker::ThrottleSecondsTotal, worked_queue: queue) { @leaky_bucket.refill }
+      @leaky_bucket.observe { execute_lock_job_in(queue, cursor, run_at_lower_bound) }
+    end
+
+    def execute_lock_job_in(queue, cursor, run_at_lower_bound)
+      strategy = cursor.zero? ? "full" : "cursor"
+      observe(Locker::AcquireTotal, Locker::AcquireSecondsTotal,
+              worked_queue: queue,
+              strategy: strategy) do
+        lock_job_query(queue, cursor, run_at_lower_bound)
+      end
+    end
+
+    def exists?(job)
+      observe(Locker::ExistsTotal, Locker::ExistsSecondsTotal, worked_queue: job[:queue]) do
+        Que.execute(:check_job, job.values_at(*Job::JOB_INSTANCE_FIELDS)).any? if job
+      end
+    end
+
+    def lock_job_query(queue, cursor, run_at_lower_bound)
+      Que.execute(:lock_job, [queue, cursor, run_at_lower_bound]).first
+    end
+
+    def handle_expired_cursors!
+      @consolidated_queues.each do |queue|
+        queue_cursor_expires_at = @queue_expires_at.fetch(queue, monotonic_now)
+        reset_cursor_for!(queue) if queue_cursor_expires_at < monotonic_now
+      end
+    end
+
+    def reset_cursor_for!(queue)
+      @queue_cursors[queue] = 0
+      @run_at_lower_bounds[queue] = RUN_AT_CURSOR_RESET
+      @queue_expires_at[queue] = monotonic_now + @cursor_expiry
+    end
+
+    def observe(metric, metric_duration, labels = {})
+      now = monotonic_now
+      yield
+    ensure
+      metric&.increment(labels: labels.merge(queue: @queue, primary_queue: @queue))
+      metric_duration&.increment(
+        by: monotonic_now - now,
+        labels: labels.merge(queue: @queue, primary_queue: @queue),
+      )
+    end
+
+    def monotonic_now
+      Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    end
+  end
+end

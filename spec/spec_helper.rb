@@ -60,6 +60,7 @@ RSpec.configure do |config|
     FakeJob.log = []
     ExceptionalJob.log = []
     ExceptionalJob::WithFailureHandler.log = []
+    InterruptibleSleepJob.log = []
 
     # In normal runtime we'll new-up metrics with consistent labels, but in tests we'll
     # create workers with all sorts of configurations. Ensure we clear the registry to
@@ -77,9 +78,11 @@ RSpec.configure do |config|
   end
 end
 
-def with_workers(num, stop_timeout: 5, secondary_queues: [], &block)
+def with_workers(num, stop_timeout: 5, secondary_queues: [], architecture: Que::WorkerGroup::DEFAULT_ARCHITECTURE,
+                 &block)
   Que::WorkerGroup.start(
     num,
+    architecture: architecture,
     wake_interval: 0.01,
     secondary_queues: secondary_queues,
   ).tap(&block).stop(stop_timeout)

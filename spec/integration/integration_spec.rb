@@ -4,14 +4,14 @@ require "spec_helper"
 require "que/worker" # required to prevent autoload races
 
 # rubocop:disable RSpec/DescribeClass
-RSpec.describe "multiple workers" do
+RSpec.shared_examples "multiple workers" do |architecture|
   context "with one worker and many jobs" do
     it "works each job exactly once" do
       10.times.each { |i| FakeJob.enqueue(i) }
 
       expect(QueJob.count).to eq(10)
 
-      with_workers(1) { wait_for_jobs_to_be_worked }
+      with_workers(1, architecture: architecture) { wait_for_jobs_to_be_worked }
 
       expect(QueJob.count).to eq(0)
       expect(FakeJob.log.count).to eq(10)
@@ -26,7 +26,7 @@ RSpec.describe "multiple workers" do
 
         expect(QueJob.count).to eq(2)
 
-        with_workers(1) { wait_for_jobs_to_be_worked(timeout: 1) }
+        with_workers(1, architecture: architecture) { wait_for_jobs_to_be_worked(timeout: 1) }
 
         expect(QueJob.count).to eq(1)
         expect(FakeJob.log.count).to eq(1)
@@ -40,7 +40,7 @@ RSpec.describe "multiple workers" do
 
         expect(QueJob.count).to eq(2)
 
-        with_workers(1, secondary_queues: ["non-default"]) do
+        with_workers(1, architecture: architecture, secondary_queues: ["non-default"]) do
           wait_for_jobs_to_be_worked(timeout: 1)
         end
 
@@ -55,7 +55,7 @@ RSpec.describe "multiple workers" do
 
         expect(QueJob.count).to eq(3)
 
-        with_workers(1, secondary_queues: ["non-default"]) do
+        with_workers(1, architecture: architecture, secondary_queues: ["non-default"]) do
           wait_for_jobs_to_be_worked(timeout: 1)
         end
 
@@ -71,7 +71,7 @@ RSpec.describe "multiple workers" do
 
       expect(QueJob.count).to eq(1)
 
-      with_workers(5) { wait_for_jobs_to_be_worked }
+      with_workers(5, architecture: architecture) { wait_for_jobs_to_be_worked }
 
       expect(QueJob.count).to eq(0)
       expect(FakeJob.log.count).to eq(1)
@@ -95,7 +95,7 @@ RSpec.describe "multiple workers" do
 
       expect(QueJob.count).to eq(3)
 
-      with_workers(5) { wait_for_jobs_to_be_worked }
+      with_workers(5, architecture: architecture) { wait_for_jobs_to_be_worked }
 
       expect(QueJob.count).to eq(0)
       expect(User.count).to eq(3)
@@ -110,7 +110,7 @@ RSpec.describe "multiple workers" do
       # Sleep to let the worker pick-up the SleepJob, then stop the worker with an
       # aggressive timeout. This should cause JobTimeout to be raised in the worker
       # thread.
-      with_workers(1, stop_timeout: 0.01) { sleep 0.1 }
+      with_workers(1, architecture: architecture, stop_timeout: 0.01) { sleep 0.1 }
 
       sleep_job = QueJob.last
 
@@ -125,12 +125,25 @@ RSpec.describe "multiple workers" do
 
         # Sleep 0.1s to let the worker pick-up the SleepJob, then stop the worker with a
         # a long enough timeout to let an iteration of sleep complete.
-        with_workers(1, stop_timeout: 0.3) { sleep 0.1 }
+        with_workers(1, architecture: architecture, stop_timeout: 0.3) { sleep 0.1 }
 
         expect(QueJob.count).to eq(0)
         expect(InterruptibleSleepJob.log.count).to eq(1)
       end
     end
+  end
+end
+
+# Run the exact same behavioural suite against both locking architectures (see
+# Que::WorkerGroup) - the two implementations are meant to be indistinguishable from the
+# outside, and this is our regression coverage for that.
+RSpec.describe "multiple workers, across architectures" do
+  context "with architecture: legacy" do
+    it_behaves_like "multiple workers", :legacy
+  end
+
+  context "with architecture: centralized" do
+    it_behaves_like "multiple workers", :centralized
   end
 end
 # rubocop:enable RSpec/DescribeClass
