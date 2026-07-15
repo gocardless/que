@@ -52,7 +52,7 @@ module Que
           SELECT j
           FROM que_jobs AS j
           WHERE queue = $1::text
-          AND job_id > $2
+          AND job_id >= $2
           AND run_at >= COALESCE($3::timestamptz, '-infinity'::timestamptz)
           AND run_at <= now()
           AND retryable = true
@@ -237,6 +237,15 @@ module Que
       SELECT pg_advisory_unlock($1)
     },
 
+    # Note: job_id is a strict `>` cursor bound here (unlike lock_job's `>=`). This query
+    # is shared by both Adapters::ActiveRecordWithLock#lock_job_with_lock_database
+    # (single job at a time) and #lock_jobs_with_lock_database (used by
+    # architecture: :centralized to lock a batch across several calls within one poll).
+    # The batched caller advances its cursor to a job_id it may have *just* locked in a
+    # previous call within the same poll, without necessarily having released it yet - an
+    # inclusive `>=` would let this query re-select that same row, and since
+    # pg_try_advisory_lock succeeds again for a lock the same session already holds,
+    # that job would be locked (and dispatched) a second time.
     find_job_to_lock: %{
       SELECT
         queue,

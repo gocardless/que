@@ -1,21 +1,22 @@
 # frozen_string_literal: true
 
 require_relative "worker"
-require_relative "legacy_worker"
+require_relative "centralized_worker"
 require_relative "locker"
+require_relative "centralized_locker"
 require_relative "job_buffer"
 
 module Que
   class WorkerGroup
     DEFAULT_STOP_TIMEOUT = 5 # seconds
 
-    # :legacy - one Locker per worker thread, each independently polling Postgres (the
+    # :legacy - each Worker owns its own Locker and independently polls Postgres (the
     #   architecture Que has always used). Safe, proven default.
-    # :centralized - one Locker per process, batching lock queries into a shared
-    #   JobBuffer that worker threads pull from. Reduces the number of concurrent lock
-    #   queries hitting Postgres from one-per-worker-thread to one-per-process, at the
-    #   cost of being newer and less battle-tested. See README for guidance on rolling
-    #   this out.
+    # :centralized - a single CentralizedLocker per process, batching lock queries into a
+    #   shared JobBuffer that CentralizedWorker threads pull from. Reduces the number of
+    #   concurrent lock queries hitting Postgres from one-per-worker-thread to
+    #   one-per-process, at the cost of being newer and less battle-tested. See README
+    #   for guidance on rolling this out.
     ARCHITECTURES = %i[legacy centralized].freeze
     DEFAULT_ARCHITECTURE = :legacy
 
@@ -32,11 +33,12 @@ module Que
 
       LockerAliveGauge = Prometheus::Client::Gauge.new(
         :que_worker_group_locker_alive,
-        docstring: "Whether this process's single centralized Locker thread is alive " \
+        docstring: "Whether this process's single CentralizedLocker thread is alive " \
                    "(1) or dead (0). Only meaningful with architecture: :centralized - " \
-                   "the Locker is what polls Postgres for jobs there, so if it's dead, " \
-                   "no worker in this process will ever find new work. Always 0 under " \
-                   "architecture: :legacy, where there is no single Locker.",
+                   "the CentralizedLocker is what polls Postgres for jobs there, so if " \
+                   "it's dead, no worker in this process will ever find new work. " \
+                   "Always 0 under architecture: :legacy, where there is no single " \
+                   "locker thread.",
       ),
     ].freeze
 
@@ -44,7 +46,7 @@ module Que
       count,
       architecture: DEFAULT_ARCHITECTURE,
       queue: Worker::DEFAULT_QUEUE,
-      wake_interval: Locker::DEFAULT_WAKE_INTERVAL,
+      wake_interval: Worker::DEFAULT_WAKE_INTERVAL,
       lock_cursor_expiry: wake_interval,
       lock_window: nil,
       lock_budget: nil,
@@ -85,7 +87,7 @@ module Que
     )
       workers =
         Array.new(count) do
-          LegacyWorker.new(
+          Worker.new(
             queue: queue,
             wake_interval: wake_interval,
             lock_cursor_expiry: lock_cursor_expiry,
@@ -107,7 +109,7 @@ module Que
       job_buffer = JobBuffer.new(maximum_size: count)
 
       locker =
-        Locker.new(
+        CentralizedLocker.new(
           queue: queue,
           cursor_expiry: lock_cursor_expiry,
           window: lock_window,
@@ -120,7 +122,7 @@ module Que
 
       workers =
         Array.new(count) do
-          Worker.new(queue: queue, wake_interval: wake_interval, job_buffer: job_buffer)
+          CentralizedWorker.new(queue: queue, wake_interval: wake_interval, job_buffer: job_buffer)
         end
 
       new(workers, start_worker_threads(workers), locker, job_buffer)

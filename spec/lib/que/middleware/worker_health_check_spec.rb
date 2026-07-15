@@ -6,7 +6,7 @@ RSpec.describe Que::Middleware::WorkerHealthCheck do
   subject(:health_check) { described_class.new(worker_group) }
 
   let(:worker_group) { instance_double(Que::WorkerGroup, workers: workers, locker: locker) }
-  let(:locker) { instance_double(Que::Locker, healthy?: true) }
+  let(:locker) { instance_double(Que::CentralizedLocker, healthy?: true) }
 
   describe "#call" do
     context "when the locker and all workers are healthy" do
@@ -63,7 +63,7 @@ RSpec.describe Que::Middleware::WorkerHealthCheck do
     end
 
     context "when the locker is unhealthy, even if all workers are healthy" do
-      let(:locker) { instance_double(Que::Locker, healthy?: false) }
+      let(:locker) { instance_double(Que::CentralizedLocker, healthy?: false) }
       let(:workers) do
         [
           instance_double(Que::Worker, healthy?: true),
