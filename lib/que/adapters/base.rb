@@ -31,7 +31,7 @@ module Que
         # integer
         23 => proc(&:to_i),
         # json
-        114 => ->(value) { JSON_MODULE.load(value, create_additions: false) },
+        114 => ->(value) { JSON_MODULE.parse(value, create_additions: false) },
         # float
         701 => proc(&:to_f),
         # timestamp with time zone
@@ -74,7 +74,7 @@ module Que
           # The pg gem unfortunately doesn't convert fractions of time instances, so cast
           # them to a string.
           when Time then param.strftime("%Y-%m-%d %H:%M:%S.%6N %z")
-          when Array, Hash then JSON_MODULE.dump(param)
+          when Array, Hash then JSON_MODULE.generate(param)
           else param
           end
         end
