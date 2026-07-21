@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "json"
 require "socket" # For hostname
 
 require_relative "que/adapters/base"
@@ -17,14 +18,6 @@ require_relative "que/middleware/queue_collector"
 require_relative "que/middleware/worker_health_check"
 
 module Que
-  begin
-    require "multi_json"
-    JSON_MODULE = MultiJson
-  rescue LoadError
-    require "json"
-    JSON_MODULE = JSON
-  end
-
   HASH_DEFAULT_PROC = proc { |hash, key| hash[key.to_s] if key.is_a?(Symbol) }
 
   INDIFFERENTIATOR = proc do |object|

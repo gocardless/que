@@ -10,7 +10,6 @@ group :development, :test do
   gem 'activerecord',    require: nil
   gem 'connection_pool', require: nil
   gem 'gc_ruboconfig'
-  gem 'multi_json', '~> 1.21', require: nil
   gem 'pg', require: nil, platform: :ruby
   gem 'pg_jruby', require: nil, platform: :jruby
   gem 'pond', require: nil
