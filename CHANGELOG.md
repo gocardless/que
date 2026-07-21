@@ -1,9 +1,5 @@
 ### Unreleased
 
-*   Fix recurring JSON issues by dropping MultiJson support.
-
-### 0.12.3 (2017-06-01)
-
 *   JobTimeoutError < Interrupt, to avoid accidental rescuing
 *   Change default queue from '' to 'default'
 *   Expose `que_dead_tuples` metric
@@ -20,6 +16,10 @@
 *   Changes to logging key/values
 *   Introduction of Kubernetes benchmark code
 *   Performance patch to Que locking
+
+### 0.13.0 (2017-06-08)
+
+*   Fix recurring JSON issues by dropping MultiJson support.
 
 ### 0.11.8 (2017-07-12)
 
