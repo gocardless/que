@@ -113,6 +113,65 @@ To determine what happens when a job is queued, you can set Que's mode. There ar
 **If you're using ActiveRecord to dump your database's schema, [set your schema_format to :sql](http://guides.rubyonrails.org/migrations.html#types-of-schema-dumps) so that Que's table structure is managed correctly.** (You can use schema_format as :ruby if you want but keep in mind this is highly advised against, as some parts of Que will not work.)
 
 
+## Running workers (`bin/que`)
+
+This fork ships a `bin/que` executable for running a pool of worker threads in a
+dedicated process:
+
+```shell
+$ bin/que ./config/environment.rb
+```
+
+Run `bin/que -h` for the full list of options. The most commonly used ones:
+
+  * `-c, --worker-count [COUNT]` - number of worker threads to run (default: 1)
+  * `-q, --queue-name [NAME]` - primary queue to work jobs from (default: `default`)
+  * `--secondary-queues a,b` - additional queues to fall back to once the primary queue is empty
+  * `-i, --wake-interval [SECONDS]` - how often to poll Postgres when there's no work available (default: 5.0)
+  * `-p, --metrics-port [PORT]` - serve Prometheus metrics and a health-check endpoint (`/`) on this port
+  * `--timeout [SECONDS]` - how long to wait for in-flight jobs to finish on SIGINT/SIGTERM before forcing them to stop
+
+### Job-locking architecture (`-a`/`--architecture`)
+
+Que supports two strategies for how worker threads acquire (lock) jobs from Postgres,
+selected with `-a`/`--architecture` on the command line, or the `QUE_ARCHITECTURE`
+environment variable:
+
+  * **`legacy`** (the default) - each worker thread independently polls Postgres and
+    locks its own jobs. This is the architecture Que has always used, and remains the
+    default because it's the most battle-tested.
+  * **`centralized`** - a single Locker thread per process polls Postgres and locks jobs
+    in batches, handing them out to worker threads through an in-memory buffer. This
+    exists to fix a scaling problem with `legacy`: with N worker threads, `legacy` runs
+    N independent lock queries against `que_jobs` on every poll cycle, and contention
+    between them gets worse as you add more workers. `centralized` collapses that down
+    to one lock query per process, regardless of worker count.
+
+```shell
+# Explicitly select an architecture on the command line:
+$ bin/que --architecture=centralized ./config/environment.rb
+
+# Or via the environment (useful for toggling per-deployment without a code change):
+$ QUE_ARCHITECTURE=centralized bin/que ./config/environment.rb
+```
+
+The two architectures are meant to be indistinguishable from the outside - same job
+semantics ("works each job exactly once"), same Prometheus metrics, same health-check
+behavior (`Que::Middleware::WorkerHealthCheck`) - so it's safe to flip between them with
+just a redeploy/restart, no migration or code change required. If you're seeing lock
+contention or CPU usage that scales with worker count, try `centralized` on a
+low-traffic queue or environment first, watch it for a while, and roll it out further
+from there before making it the default in your deployment configuration - `legacy` has
+years of production usage behind it, `centralized` doesn't yet.
+
+If you're constructing a `Que::WorkerGroup` directly (rather than via `bin/que`), the
+same option is available as `architecture:`:
+
+```ruby
+Que::WorkerGroup.start(4, architecture: :centralized)
+```
+
+
 ## Related Projects
 
   * [que-web](https://github.com/statianzo/que-web) is a Sinatra-based UI for inspecting your job queue.

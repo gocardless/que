@@ -96,6 +96,74 @@ module Que
       AND    job_id   = $4::bigint
     ),
 
+    # Identical to lock_job, except that it locks up to $4 jobs in a single round trip
+    # instead of exactly one. Used by the (single, per-process) Locker to fill its
+    # JobBuffer, rather than by each worker locking its own single job.
+    #
+    # As with lock_job, the top-level SELECT's LIMIT is what bounds the recursion - Postgres
+    # pulls rows from the recursive term lazily, so it stops iterating as soon as either
+    # $4 jobs have been locked or there are no more candidates left in the queue.
+    #
+    # $5 is an exclusion list of job_ids the Locker already holds (buffered, or checked
+    # out to a worker). This is essential for correctness, not just an optimisation:
+    # pg_try_advisory_lock succeeds again if *the same session* already holds the lock, so
+    # without this exclusion, a poll that resets its job_id cursor back to the start of the
+    # queue (see Locker#lock_jobs_for) would re-lock - and re-dispatch - a job this same
+    # Locker is already working, causing it to run twice.
+    lock_jobs_batch: %{
+      WITH RECURSIVE jobs AS (
+        SELECT (j).*, pg_try_advisory_lock((j).job_id) AS locked
+        FROM (
+          SELECT j
+          FROM que_jobs AS j
+          WHERE queue = $1::text
+          AND job_id > $2
+          AND NOT job_id = ANY($5::bigint[])
+          AND run_at >= COALESCE($3::timestamptz, '-infinity'::timestamptz)
+          AND run_at <= now()
+          AND retryable = true
+          ORDER BY priority, run_at, job_id
+          LIMIT 1
+        ) AS t1
+        UNION ALL (
+          SELECT (j).*, pg_try_advisory_lock((j).job_id) AS locked
+          FROM (
+            SELECT (
+              SELECT j
+              FROM que_jobs AS j
+              WHERE queue = $1::text
+              AND NOT job_id = ANY($5::bigint[])
+              AND run_at >= COALESCE($3::timestamptz, '-infinity'::timestamptz)
+              AND run_at <= now()
+              AND retryable = true
+              AND (priority, run_at, job_id) > (jobs.priority, jobs.run_at, jobs.job_id)
+              ORDER BY priority, run_at, job_id
+              LIMIT 1
+            ) AS j
+            FROM jobs
+            WHERE jobs.job_id IS NOT NULL
+            LIMIT 1
+          ) AS t1
+        )
+      )
+      SELECT queue, priority, run_at, job_id, job_class, retryable, args, error_count,
+             extract(epoch from (now() - run_at)) as latency
+      FROM jobs
+      WHERE locked
+      LIMIT $4::bigint
+    },
+
+    # Batched counterpart to the existence re-check done after taking a job's advisory
+    # lock (pg locks don't obey MVCC, so a job can be locked despite having just been
+    # destroyed by the worker that was already working it - see Locker for details).
+    # job_id is globally unique, so it alone is sufficient to identify surviving jobs.
+    check_jobs_batch: %(
+      SELECT job_id
+      FROM   que_jobs
+      WHERE  retryable = true
+      AND    job_id = ANY($1::bigint[])
+    ),
+
     set_error: %{
       UPDATE que_jobs
       SET error_count = $1::integer,
@@ -169,6 +237,15 @@ module Que
       SELECT pg_advisory_unlock($1)
     },
 
+    # Note: job_id is a strict `>` cursor bound here (unlike lock_job's `>=`). This query
+    # is shared by both Adapters::ActiveRecordWithLock#lock_job_with_lock_database
+    # (single job at a time) and #lock_jobs_with_lock_database (used by
+    # architecture: :centralized to lock a batch across several calls within one poll).
+    # The batched caller advances its cursor to a job_id it may have *just* locked in a
+    # previous call within the same poll, without necessarily having released it yet - an
+    # inclusive `>=` would let this query re-select that same row, and since
+    # pg_try_advisory_lock succeeds again for a lock the same session already holds,
+    # that job would be locked (and dispatched) a second time.
     find_job_to_lock: %{
       SELECT
         queue,
@@ -184,7 +261,7 @@ module Que
       WHERE queue = $1::text
             AND run_at <= now()
             AND retryable = true
-            AND job_id >= $2
+            AND job_id > $2
             AND run_at >= COALESCE($3::timestamptz, '-infinity'::timestamptz)
             ORDER BY priority, run_at, job_id
             FOR UPDATE SKIP LOCKED

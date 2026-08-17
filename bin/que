@@ -51,6 +51,10 @@ OptionParser.new do |opts|
     options.run_at_cursor = true
   end
 
+  opts.on("-a", "--architecture [ARCHITECTURE]", String, "Job-locking architecture to use: 'legacy' (default; one Locker per worker thread) or 'centralized' (one Locker per process, batching lock queries into a shared buffer - reduces concurrent lock queries against Postgres at higher worker counts, but is newer and less battle-tested; see README)") do |architecture|
+    options.architecture = architecture
+  end
+
   opts.on("-c", "--worker-count [COUNT]", Integer, "Start this many threaded workers") do |worker_count|
     options.worker_count = worker_count
   end
@@ -108,6 +112,12 @@ run_at_cursor    = options.run_at_cursor || false
 worker_count     = options.worker_count  || 1
 timeout          = options.timeout
 secondary_queues = options.secondary_queues || []
+architecture     = (options.architecture || ENV["QUE_ARCHITECTURE"] || Que::WorkerGroup::DEFAULT_ARCHITECTURE).to_sym
+
+unless Que::WorkerGroup::ARCHITECTURES.include?(architecture)
+  $stdout.puts "Bad architecture: '#{architecture}' (expected one of: #{Que::WorkerGroup::ARCHITECTURES.join(', ')})"
+  exit 1
+end
 
 Que.logger ||= Logger.new($stdout)
 
@@ -127,6 +137,7 @@ end
 
 worker_group = Que::WorkerGroup.start(
   worker_count,
+  architecture: architecture,
   queue: queue_name,
   wake_interval: wake_interval,
   lock_cursor_expiry: cursor_expiry,
