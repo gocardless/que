@@ -103,6 +103,24 @@ RSpec.describe "multiple workers" do
     end
   end
 
+  context "with pg_notify listening enabled" do
+    it "works a job enqueued while idle well before the wake interval elapses" do
+      start = nil
+
+      with_workers(1, wake_interval: 20, listen: true) do
+        sleep 0.2 # give the listener time to issue LISTEN before we enqueue
+
+        start = Time.now
+        FakeJob.enqueue(1)
+        wait_for_jobs_to_be_worked(timeout: 2)
+      end
+
+      expect(Time.now - start).to be < 2
+      expect(QueJob.count).to eq(0)
+      expect(FakeJob.log).to eq([1])
+    end
+  end
+
   context "with jobs that exceed stop timeout" do
     it "raises Que::JobTimeoutError" do
       SleepJob.enqueue(5) # sleep 5s

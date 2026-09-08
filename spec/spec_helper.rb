@@ -77,11 +77,12 @@ RSpec.configure do |config|
   end
 end
 
-def with_workers(num, stop_timeout: 5, secondary_queues: [], &block)
+def with_workers(num, stop_timeout: 5, secondary_queues: [], wake_interval: 0.01, listen: false, &block)
   Que::WorkerGroup.start(
     num,
-    wake_interval: 0.01,
+    wake_interval: wake_interval,
     secondary_queues: secondary_queues,
+    listen: listen,
   ).tap(&block).stop(stop_timeout)
 end
 
