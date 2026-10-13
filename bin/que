@@ -23,7 +23,7 @@ $stdout.sync = true
 
 options = OpenStruct.new
 
-# rubocop:disable Layout/LineLength
+# rubocop:disable-next Layout/LineLength
 OptionParser.new do |opts|
   opts.banner = "usage: que [options] file/to/require ..."
 
@@ -82,7 +82,6 @@ OptionParser.new do |opts|
     exit 0
   end
 end.parse!(ARGV)
-# rubocop:enable Layout/LineLength
 
 if ARGV.empty?
   $stdout.puts <<~OUTPUT

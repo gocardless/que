@@ -90,11 +90,10 @@ module Que
       end
     end
 
-    # rubocop:disable Naming/AccessorMethodName
+    # rubocop:disable-next Naming/AccessorMethodName
     def get_custom_log_context
       self.class.log_context_proc&.call(@attrs) || {}
     end
-    # rubocop:enable Naming/AccessorMethodName
 
     # This is accepting JOB_OPTIONS and args as keyword parameters. In future we want to
     # set instance variables instead of using a grab bag of parameters, which would allow

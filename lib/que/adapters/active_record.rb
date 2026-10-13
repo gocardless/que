@@ -56,11 +56,10 @@ module Que
       end
 
       class TransactionCallback
-        # rubocop:disable Naming/PredicateName
+        # rubocop:disable-next Naming/PredicatePrefix
         def has_transactional_callbacks?
           true
         end
-        # rubocop:enable Naming/PredicateName
 
         def rolledback!(force_restore_state = false, should_run_callbacks = true)
           # no-op
