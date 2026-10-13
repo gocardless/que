@@ -26,18 +26,13 @@ module Que
         @refresh_interval = options.fetch(:refresh_interval, 20.seconds)
         begin
           @registry.register(Queued)
-        rescue StandardError
-          Prometheus::Client::Registry::AlreadyRegisteredError
+        rescue Prometheus::Client::Registry::AlreadyRegisteredError
+          nil
         end
         begin
           @registry.register(QueuedPastDue)
-        rescue StandardError
-          Prometheus::Client::Registry::AlreadyRegisteredError
-        end
-        begin
-          @registry.register(DeadTuples)
-        rescue StandardError
-          Prometheus::Client::Registry::AlreadyRegisteredError
+        rescue Prometheus::Client::Registry::AlreadyRegisteredError
+          nil
         end
       end
 
