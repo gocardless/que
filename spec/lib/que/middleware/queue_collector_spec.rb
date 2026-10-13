@@ -5,7 +5,7 @@ require "spec_helper"
 RSpec.describe Que::Middleware::QueueCollector do
   subject(:collector) { described_class.new(->(_env) {}, options) }
 
-  let(:options) { { refresh_interval: 0.1.second } }
+  let(:options) { { refresh_interval: 0 } }
   let(:now) { postgres_now }
   let(:due_now_delay) { 1000.0 }
   let(:due_later_than_now_delay) { due_now_delay / 2 }
@@ -98,6 +98,8 @@ RSpec.describe Que::Middleware::QueueCollector do
       it "will register metrics" do
         expect(registry).to receive(:register).with(described_class::Queued)
         expect(registry).to receive(:register).with(described_class::QueuedPastDue)
+        expect(registry).to receive(:register).with(described_class::RefreshDuration)
+        expect(registry).to receive(:register).with(described_class::RefreshErrorsTotal)
 
         collector
       end
@@ -129,6 +131,24 @@ RSpec.describe Que::Middleware::QueueCollector do
         { queue: "default", job_class: "FakeJob", priority: "1",
           due: "true", failed: "false" } => 2.0,
       )
+    end
+  end
+
+  describe "refresh metrics" do
+    it "records the refresh duration" do
+      collector.call({})
+
+      expect(described_class::RefreshDuration.values.fetch({})).to be > 0
+    end
+
+    it "counts failed refreshes" do
+      allow(Que).to receive(:execute).and_call_original
+      allow(Que).to receive(:execute).
+        with("refresh materialized view que_jobs_summary;").
+        and_raise(PG::QueryCanceled, "canceling statement due to statement timeout")
+
+      expect { collector.call({}) }.
+        to change { described_class::RefreshErrorsTotal.values.fetch({}, 0.0) }.by(1.0)
     end
   end
 end
