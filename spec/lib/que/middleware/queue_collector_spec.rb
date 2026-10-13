@@ -14,6 +14,15 @@ RSpec.describe Que::Middleware::QueueCollector do
   let(:pending_now) { now + 1000 }
 
   before do
+    # Gauges are process-global, so give each example fresh series. Otherwise label sets
+    # from other examples (e.g. ActiveJob classes) leak into the exact matches below.
+    [described_class::Queued, described_class::QueuedPastDue].each do |gauge|
+      gauge.send(
+        :replace_internal_store,
+        Prometheus::Client.config.data_store.for_metric(gauge.name, metric_type: gauge.type),
+      )
+    end
+
     FakeJob.enqueue(run_at: due_now, priority: 1) # due, should be runnable
     FakeJob.enqueue(run_at: due_later_than_now, priority: 1) # same as above, for 2nd count
     FakeJob.enqueue(run_at: due_now, priority: 10) # due, different priority
@@ -92,6 +101,34 @@ RSpec.describe Que::Middleware::QueueCollector do
 
         collector
       end
+    end
+  end
+
+  describe "ActiveJob wrapped jobs" do
+    let(:wrapper) { "ActiveJob::QueueAdapters::QueAdapter::JobWrapper" }
+
+    before do
+      Que.execute(:insert_job, ["default", 1, due_now, wrapper, true, [{ "job_class" => "MyActiveJob" }]])
+    end
+
+    it "reports the wrapped class instead of the wrapper" do
+      collector.call({})
+
+      expect(described_class::Queued.values).to include(
+        { queue: "default", job_class: "MyActiveJob", priority: "1",
+          due: "true", failed: "false" } => 1.0,
+      )
+      expect(described_class::Queued.values.keys.map { |labels| labels[:job_class] }).
+        to_not include(wrapper)
+    end
+
+    it "leaves native job classes unchanged" do
+      collector.call({})
+
+      expect(described_class::Queued.values).to include(
+        { queue: "default", job_class: "FakeJob", priority: "1",
+          due: "true", failed: "false" } => 2.0,
+      )
     end
   end
 end
