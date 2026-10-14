@@ -1,3 +1,9 @@
+### v0.23.0
+
+*   Migration 7: `que_jobs_summary` reports the wrapped class for ActiveJob jobs
+    (`job_class LIKE 'ActiveJob::QueueAdapters::%'` uses `args->0->>'job_class'`)
+*   Add `que_queue_summary_refresh_seconds` and `que_queue_summary_refresh_errors_total`
+
 ### Unreleased
 
 *   JobTimeoutError < Interrupt, to avoid accidental rescuing

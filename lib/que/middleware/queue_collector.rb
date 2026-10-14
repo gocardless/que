@@ -20,6 +20,17 @@ module Que
         labels: %i[queue job_class priority due failed],
       )
 
+      RefreshDuration = Prometheus::Client::Gauge.new(
+        :que_queue_summary_refresh_seconds,
+        docstring: "Duration of the last successful que_jobs_summary refresh",
+      )
+
+      RefreshErrorsTotal = Prometheus::Client::Counter.new(
+        :que_queue_summary_refresh_errors_total,
+        docstring: "Number of failed que_jobs_summary refreshes " \
+                   "(gauges are stale while failing)",
+      )
+
       def initialize(app, options = {})
         @app = app
         @registry = options.fetch(:registry, Prometheus::Client.registry)
@@ -33,6 +44,16 @@ module Que
           @registry.register(QueuedPastDue)
         rescue Prometheus::Client::Registry::AlreadyRegisteredError
           nil
+        end
+        begin
+          @registry.register(RefreshDuration)
+        rescue StandardError
+          Prometheus::Client::Registry::AlreadyRegisteredError
+        end
+        begin
+          @registry.register(RefreshErrorsTotal)
+        rescue StandardError
+          Prometheus::Client::Registry::AlreadyRegisteredError
         end
       end
 
@@ -71,13 +92,16 @@ module Que
         # Ensure generating metrics never take more than 5000ms to execute. If we can't
         # grab the lock within 100ms, then we know someone else is refreshing the view,
         # and should quit silently
+        started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
         Que.transaction do
           Que.execute("set local lock_timeout='100ms';")
           Que.execute("set local statement_timeout='5000ms';")
           Que.execute("refresh materialized view que_jobs_summary;")
           Que.execute("analyze que_jobs_summary;")
         end
+        RefreshDuration.set(Process.clock_gettime(Process::CLOCK_MONOTONIC) - started)
       rescue StandardError => e
+        RefreshErrorsTotal.increment
         Que.logger.info(event: "refresh_materialized_view", error: e.to_s)
       end
 
