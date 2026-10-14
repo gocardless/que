@@ -205,7 +205,7 @@ module Que
             klass = class_for(job[:job_class])
 
             log_keys.merge!(
-              (klass.log_context_proc&.call(job) || {}),
+              klass.log_context_proc&.call(job) || {},
             )
 
             Que.logger&.info(

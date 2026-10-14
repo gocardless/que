@@ -3,7 +3,7 @@
 require "spec_helper"
 require "que/worker" # required to prevent autoload races
 
-# rubocop:disable RSpec/DescribeClass
+# rubocop:disable-next RSpec/DescribeClass
 RSpec.describe "multiple workers" do
   context "with one worker and many jobs" do
     it "works each job exactly once" do
@@ -115,7 +115,7 @@ RSpec.describe "multiple workers" do
       sleep_job = QueJob.last
 
       expect(sleep_job).to_not be_nil
-      expect(sleep_job.last_error).to match(/Job exceeded timeout when requested to stop/)
+      expect(sleep_job.last_error).to include("Job exceeded timeout when requested to stop")
     end
 
     context "but is interruptible" do
@@ -133,4 +133,3 @@ RSpec.describe "multiple workers" do
     end
   end
 end
-# rubocop:enable RSpec/DescribeClass

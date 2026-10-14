@@ -89,7 +89,7 @@ end
 def wait_for_jobs_to_be_worked(timeout: 10)
   start = Time.now
   loop do
-    break if QueJob.count == 0 || Time.now - start > timeout
+    break if QueJob.none? || Time.now - start > timeout
 
     sleep 0.1
   end

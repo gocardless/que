@@ -31,7 +31,7 @@ module Que
         # integer
         23 => proc(&:to_i),
         # json
-        114 => ->(value) { JSON_MODULE.parse(value, create_additions: false) },
+        114 => ->(value) { JSON_MODULE.parse(value) },
         # float
         701 => proc(&:to_f),
         # timestamp with time zone
@@ -141,7 +141,7 @@ module Que
         end
       end
 
-      # rubocop:disable Metrics/ParameterLists
+      # rubocop:disable-next Metrics/ParameterLists
       def log(sql, conn, binds = [], type_casted_binds = [], name = "SQL", statement_name = nil, async: false, &block)
         return yield({}) if instrumenter.nil?
 
@@ -157,7 +157,6 @@ module Que
           &block
         )
       end
-      # rubocop:enable Metrics/ParameterLists
 
       def cast_result(result)
         output = result.to_a
