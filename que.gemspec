@@ -24,7 +24,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency "ostruct"
   spec.add_dependency "prometheus-client"
   spec.add_dependency "puma"
-  spec.add_dependency "rack", ">= 2", "< 4"
+  spec.add_dependency "rack", ">= 3.2.8", "< 4"
   spec.add_dependency "rackup"
 
   spec.metadata["rubygems_mfa_required"] = "true"
