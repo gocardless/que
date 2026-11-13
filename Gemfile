@@ -22,7 +22,7 @@ group :development, :test do
   gem 'rubocop-sequel', '~> 0.4.1', require: false
   gem 'sequel', require: nil
 
-  rack_version = ENV.fetch('RACK_VERSION', "3.2.7")
+  rack_version = ENV.fetch('RACK_VERSION', "3.2.8")
   gem "rack", rack_version
   if Gem::Version.new(rack_version) < Gem::Version.new('3.0.0')
     gem "rackup", "~> 1.0"

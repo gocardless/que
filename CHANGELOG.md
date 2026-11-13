@@ -6,6 +6,8 @@
 
 ### Unreleased
 
+*   Require `rack >= 3.2.8`, dropping rack 2 support. Test against a single
+    supported rack line instead of the stale 2.2.5 and 3.1 pins.
 *   JobTimeoutError < Interrupt, to avoid accidental rescuing
 *   Change default queue from '' to 'default'
 *   Fix-up metric constant names
